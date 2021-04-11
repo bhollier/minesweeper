@@ -6,6 +6,8 @@ pixel frontend is very simplistic and exists purely for debugging purposes (for
 now). The web frontend is much more sophisticated, it is compiled into Web 
 Assembly and communicates with Javascript using events.
 
+Take a look at the web version for yourself [here](https://bhollier.github.io/minesweeper/index.html)
+
 ![Screenshot of the minesweeper clone running in a browser](screenshot.png)
 
 ### Running in a window
