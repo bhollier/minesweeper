@@ -58,10 +58,10 @@ func NewGame(width int, height int, numMines int) (*Game, error) {
 // game's state is not modified
 func (g *Game) Reset(numMines int) error {
 	// Sanity check
-	if numMines > (g.w*g.h)+9 {
+	if numMines > (g.w*g.h)-9 {
 		return fmt.Errorf(
-			"too many mines! numMines (%d) > width (%d) * height (%d) + 9",
-			g.w, g.h, numMines)
+			"too many mines! numMines (%d) > width (%d) * height (%d) - 9",
+			numMines, g.w, g.h)
 	}
 
 	// Set the number of mines

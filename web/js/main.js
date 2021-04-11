@@ -59,8 +59,7 @@ spritesheet.addEventListener('load', function() {
                 break
             case "init-err":
                 consoleLog("Received 'init-err'")
-                consoleLog("Error message: " + msg[1])
-                // todo handle this properly
+                initError(msg[1])
                 break
             case "state":
                 updateState(msg[1])
@@ -103,6 +102,14 @@ function init() {
     ctx.webkitImageSmoothingEnabled = false;
     ctx.mozImageSmoothingEnabled = false;
     ctx.imageSmoothingEnabled = false;
+}
+
+// Handles an error while initialising
+function initError(error) {
+    const stateElement = document.getElementById("state")
+    stateElement.innerText = "Error: " + error
+    stateElement.style.visibility = "visible"
+    stateDisplayed = true
 }
 
 // The conduit for HTML events to Go
