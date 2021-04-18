@@ -22,7 +22,9 @@ jobs:
           cp /usr/local/lib/tinygo/targets/wasm_exec.js ./web/js/wasm_exec.js
 
       - name: Build
-        run: tinygo build -o ./web/wasm/app.wasm -target wasm ./cmd/web/main.go
+        run: |
+          mkdir ./web/wasm
+          tinygo build -o ./web/wasm/app.wasm -target wasm ./cmd/web/main.go
 
       - name: Deploy
         uses: JamesIves/github-pages-deploy-action@4.1.1
