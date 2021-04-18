@@ -41,3 +41,19 @@ go run cmd/web/main.go
 ```
 
 This will serve the web frontend at http://localhost:8080
+
+#### tinygo
+
+Currently, building the WASM module with `go` creates a file that is ~2MB. This 
+can be reduced down to ~150KB by compiling with [tinygo](https://tinygo.org/):
+
+```shell
+tinygo -o ./web/wasm/app.wasm -target wasm --no-debug cmd/web/main.go
+```
+
+The `wasm_exec.js` file in ./web/js also needs to be replaced with the tinygo
+version. On debian systems, this can be done with the following command:
+
+```shell
+cp /usr/local/lib/tinygo/targets/wasm_exec.js ./web/js/wasm_exec.js
+```
