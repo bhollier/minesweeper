@@ -19,7 +19,7 @@ jobs:
         run: |
           wget https://github.com/tinygo-org/tinygo/releases/download/v0.17.0/tinygo_0.17.0_amd64.deb
           sudo apt install ./tinygo_0.17.0_amd64.deb
-          cp /usr/local/tinygo/targets/wasm_exec.js ./web/js/wasm_exec.js
+          cp /usr/local/lib/tinygo/targets/wasm_exec.js ./web/js/wasm_exec.js
 
       - name: Build
         run: tinygo build -o ./web/wasm/app.wasm -target wasm ./cmd/web/main.go
