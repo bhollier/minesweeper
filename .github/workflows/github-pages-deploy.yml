@@ -24,7 +24,7 @@ jobs:
       - name: Build
         run: |
           mkdir ./web/wasm
-          tinygo build -o ./web/wasm/app.wasm -target wasm ./cmd/web/main.go
+          tinygo build -o ./web/wasm/app.wasm -target wasm --no-debug ./cmd/web/main.go
 
       - name: Deploy
         uses: JamesIves/github-pages-deploy-action@4.1.1
