@@ -1,0 +1,34 @@
+{
+  "name": "minesweeper",
+  "version": "2.0.0",
+  "description": "Minesweeper clone",
+  "main": "src/main.ts",
+  "scripts": {
+    "start": "tsc && http-server -a localhost -o",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "eslint ."
+  },
+  "repository": {
+    "type": "git",
+    "url": "github.com/bhollier/minesweeper"
+  },
+  "keywords": [
+    "minesweeper",
+    "clone"
+  ],
+  "author": "Ben Hollier",
+  "license": "ISC",
+  "exports": {
+    "./": "./src/"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^5.17.0",
+    "@typescript-eslint/parser": "^5.17.0",
+    "eslint": "^8.12.0",
+    "http-server": "^14.1.0",
+    "typescript": "^4.6.3"
+  },
+  "dependencies": {
+    "@types/golang-wasm-exec": "^1.15.0"
+  }
+}

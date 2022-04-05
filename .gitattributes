@@ -1,2 +1,3 @@
-# Mark wasm_exec.js as a vendored library (so it doesn't affect language stats)
-wasm_exec.js linguist-vendored
+# Mark the vendor folder (this might not be necessary, as linguist likely marks
+# it automatically)
+web/js/vendor/* linguist-vendored

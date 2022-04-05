@@ -1,6 +1,5 @@
 package minesweeper
 
-// Type for a tile's "type"
 type TileType int
 
 const (
@@ -14,14 +13,14 @@ const (
 	TileType7
 	TileType8
 	TileTypeMine
-	// This tile type is only used for conveying the appearance of a tile
+	// TileTypeHidden is only used for conveying the appearance of a tile
 	TileTypeHidden
-	// This tile type is only used for conveying the appearance of a tile
+	// TileTypeFlag is only used for conveying the appearance of a tile
 	TileTypeFlag
 	NumTileTypes
 )
 
-// Type for a minesweeper tile
+// Tile represents a single minesweeper tile
 type Tile struct {
 	// Whether the tile has been discovered
 	Discovered bool

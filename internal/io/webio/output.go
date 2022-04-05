@@ -1,46 +1,42 @@
 package webio
 
 import (
-	ms "github.com/bhollier/minesweeper/pkg/minesweeper"
 	"syscall/js"
-	"time"
 )
 
-func postMessage(name string, msg interface{}) {
-	js.Global().Call("postMessage", []interface{}{name, msg})
+type ResponseMessage struct {
+	Message
+	Success bool
 }
 
-func sendCreateOK() {
-	consoleLog("Sending 'create-ok'")
-	postMessage("create-ok", "")
+func (m ResponseMessage) ToJS() js.Value {
+	return js.ValueOf(map[string]interface{}{
+		"cmd":     m.Cmd,
+		"id":      m.Id,
+		"success": m.Success,
+		"data":    m.Data,
+	})
 }
 
-func sendInitOK() {
-	consoleLog("Sending 'init-ok'")
-	postMessage("init-ok", "")
+func postMessage(orig Message, success bool, payload interface{}) {
+	js.Global().Call("postMessage", ResponseMessage{
+		Message{
+			Cmd:  orig.Cmd,
+			Id:   orig.Id,
+			Data: js.ValueOf(payload),
+		},
+		success,
+	}.ToJS())
 }
 
-func sendInitError(err error) {
-	consoleLog("Sending 'init-err'")
-	postMessage("init-err", err.Error())
+func sendSuccess(orig Message) {
+	postMessage(orig, true, nil)
 }
 
-func sendStateResponse(s ms.GameState, timer time.Duration) {
-	body := make(map[string]interface{})
-	body["state"] = int(s)
-	body["timer"] = timer.Milliseconds()
-	postMessage("state", body)
+func sendSuccessWithPayload(orig Message, payload interface{}) {
+	postMessage(orig, true, payload)
 }
 
-func sendAppearanceResponse(appearance [][]ms.TileType) {
-	// Convert the appearance array into something js can understand
-	response := make([]interface{}, len(appearance))
-	for y, row := range appearance {
-		responseRow := make([]interface{}, len(row))
-		for x, tile := range row {
-			responseRow[x] = int(tile)
-		}
-		response[y] = responseRow
-	}
-	postMessage("appearance-response", response)
+func sendError(orig Message, err error) {
+	postMessage(orig, false, err.Error())
 }

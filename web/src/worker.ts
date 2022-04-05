@@ -5,7 +5,7 @@ if (!WebAssembly.instantiateStreaming) { // polyfill
     };
 }
 
-importScripts('wasm_exec.js');
+importScripts('./vendor/wasm_exec.js');
 const APP_WASM_PATH = "../wasm/app.wasm";
 
 const go = new Go();

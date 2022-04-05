@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// Type for the PixelIO object
+// PixelIO is an IO for minesweeper with the pixel graphics library
 type PixelIO struct {
 	game        *ms.Game
 	window      *pixelgl.Window
@@ -22,12 +22,7 @@ func New() *PixelIO {
 	return new(PixelIO)
 }
 
-// Gets the game
-func (io *PixelIO) Game() *ms.Game {
-	return io.game
-}
-
-// Runs the PixelIO object
+// Run starts the program
 func (io *PixelIO) Run() {
 	var err error
 	rand.Seed(time.Now().Unix())

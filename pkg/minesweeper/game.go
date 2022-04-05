@@ -1,29 +1,46 @@
 package minesweeper
 
 import (
+	"encoding/gob"
 	"fmt"
+	"io"
 	"math/rand"
 	"time"
 )
 
-// Type for a game's state
+// GameState represents a game's state
 type GameState int
 
 const (
-	// State for before the first tile has been uncovered
+	// GameStateStart is the state for before the first tile has been uncovered
 	GameStateStart = GameState(iota)
 
-	// State for an ongoing game (no mines uncovered but tiles are still hidden)
+	// GameStatePlaying is the state for an ongoing game (no mines uncovered but tiles are still hidden)
 	GameStatePlaying
 
-	// State for a lost game (mine uncovered)
+	// GameStateLoss is the state for a lost game (mine uncovered)
 	GameStateLoss
 
-	// State for a won game (all tiles uncovered but mines)
+	// GameStateWin is the state for a won game (all tiles uncovered but mines)
 	GameStateWin
 )
 
-// Type for the minesweeper game
+func (s GameState) String() string {
+	switch s {
+	case GameStateStart:
+		return "start"
+	case GameStatePlaying:
+		return "playing"
+	case GameStateLoss:
+		return "loss"
+	case GameStateWin:
+		return "win"
+	default:
+		return "unknown"
+	}
+}
+
+// Game stores a minesweeper game
 type Game struct {
 	w, h, numMines int
 	field          [][]Tile
@@ -31,7 +48,7 @@ type Game struct {
 	startTime      time.Time
 }
 
-// Create a new minesweeper game
+// NewGame creates a new minesweeper game
 func NewGame(width int, height int, numMines int) (*Game, error) {
 	// Create the game object
 	g := &Game{
@@ -172,27 +189,27 @@ func (g *Game) Flag(x, y int) {
 	g.field[y][x].Flagged = !g.field[y][x].Flagged
 }
 
-// Get the game's current size in tiles
+// Size returns the game's current size in tiles
 func (g *Game) Size() (width int, height int) {
 	return g.w, g.h
 }
 
-// Get the game's current state
+// State returns the game's current state
 func (g *Game) State() GameState {
 	return g.state
 }
 
-// Get the start time
+// StartTime returns the start time of the game
 func (g *Game) StartTime() time.Time {
 	return g.startTime
 }
 
-// Get the amount of time since the game started
+// SinceStart returns the amount of time since the game started
 func (g *Game) SinceStart() time.Duration {
 	return time.Now().Sub(g.startTime)
 }
 
-// Get the game's current appearance (where undiscovered tiles are
+// Appearance returns the game's current appearance (where undiscovered tiles are
 // TileTypeHidden)
 func (g *Game) Appearance() [][]TileType {
 	appearance := make([][]TileType, g.h)
@@ -222,6 +239,33 @@ func (g *Game) Appearance() [][]TileType {
 		}
 	}
 	return appearance
+}
+
+type gameExportedFields struct {
+	W, H, M int
+	F       [][]Tile
+	S       GameState
+	ST      time.Time
+}
+
+// Save the state of the game into the given io.Writer
+func (g *Game) Save(w io.Writer) error {
+	enc := gob.NewEncoder(w)
+	return enc.Encode(gameExportedFields{
+		g.w, g.h, g.numMines,
+		g.field, g.state, g.startTime,
+	})
+}
+
+// Load a game from the given io.Reader
+func Load(r io.Reader) (*Game, error) {
+	g := gameExportedFields{}
+	dec := gob.NewDecoder(r)
+	err := dec.Decode(&g)
+	return &Game{
+		g.W, g.H, g.M,
+		g.F, g.S, g.ST,
+	}, err
 }
 
 type tileAndPos struct {

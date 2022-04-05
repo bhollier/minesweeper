@@ -40,7 +40,9 @@ simple one is included:
 go run cmd/web/main.go
 ```
 
-This will serve the web frontend at http://localhost:8080
+This will serve the web frontend at http://localhost:8080. Importantly, all 
+resources from that webserver are served with 'Cache-Control' set to 'no-cache', 
+to aid with debugging
 
 #### tinygo
 
