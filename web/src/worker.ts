@@ -5,12 +5,12 @@ if (!WebAssembly.instantiateStreaming) { // polyfill
     };
 }
 
-importScripts('./vendor/wasm_exec.js');
-const APP_WASM_PATH = "../wasm/app.wasm";
+importScripts(new URL('../vendor/wasm_exec.js', import.meta.url));
+const APP_WASM_PATH = new URL("../wasm/app.wasm", import.meta.url);
 
 const go = new Go();
 let mod, inst;
-WebAssembly.instantiateStreaming(fetch(APP_WASM_PATH), go.importObject).then(
+WebAssembly.instantiateStreaming(fetch(APP_WASM_PATH.toString()), go.importObject).then(
     (result) => {
         mod = result.module;
         inst = result.instance;

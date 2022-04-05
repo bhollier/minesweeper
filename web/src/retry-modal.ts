@@ -1,15 +1,9 @@
 import Modal from './modal'
 import {Element} from './menu'
-import * as Util from "./util.js";
-import {canvas} from './util.js';
+import {canvas, SPRITES} from "./draw";
 
 export const TITLE: Element = {
-    sprite: {
-        x: 0,
-        y: 60,
-        w: 45,
-        h: Util.ROW_HEIGHT
-    },
+    sprite: SPRITES.RETRY_MENU.TITLE,
     scale: 1,
 }
 
@@ -23,11 +17,11 @@ export default class RetryModal extends Modal {
     }
 
     registerEvents() {
-        canvas.addEventListener("pointerdown", this.#handlePointerDown)
+        canvas.addEventListener("pointerdown", this.#handlePointerDown.bind(this))
     }
 
     deregisterEvents() {
-        canvas.removeEventListener("pointerdown", this.#handlePointerDown)
+        canvas.removeEventListener("pointerdown", this.#handlePointerDown.bind(this))
     }
 
     #handlePointerDown(event: PointerEvent) {

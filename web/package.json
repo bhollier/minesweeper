@@ -2,9 +2,10 @@
   "name": "minesweeper",
   "version": "2.0.0",
   "description": "Minesweeper clone",
-  "main": "src/main.ts",
+  "private": true,
   "scripts": {
-    "start": "tsc && http-server -a localhost -o",
+    "start": "webpack serve --mode=development",
+    "build": "webpack --mode=production",
     "test": "echo \"Error: no test specified\" && exit 1",
     "lint": "eslint ."
   },
@@ -18,17 +19,23 @@
   ],
   "author": "Ben Hollier",
   "license": "ISC",
-  "exports": {
-    "./": "./src/"
-  },
   "devDependencies": {
+    "@types/dateformat": "^5.0.0",
     "@typescript-eslint/eslint-plugin": "^5.17.0",
     "@typescript-eslint/parser": "^5.17.0",
+    "css-loader": "^6.7.1",
     "eslint": "^8.12.0",
+    "html-webpack-plugin": "^5.5.0",
     "http-server": "^14.1.0",
-    "typescript": "^4.6.3"
+    "ts-loader": "^9.2.8",
+    "typescript": "^4.6.3",
+    "webpack": "^5.71.0",
+    "webpack-cli": "^4.9.2",
+    "webpack-dev-server": "^4.8.0"
   },
   "dependencies": {
-    "@types/golang-wasm-exec": "^1.15.0"
+    "@types/golang-wasm-exec": "^1.15.0",
+    "dateformat": "^5.0.3",
+    "inject-body-webpack-plugin": "^1.3.0"
   }
 }

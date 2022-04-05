@@ -5,7 +5,7 @@ const queuedMessages: Array<Message> = []
 
 // Create the WASM web worker
 Util.consoleLog("Creating WASM worker")
-const worker = new Worker('src/worker.src')
+const worker = new Worker(new URL('./worker.ts', import.meta.url))
 
 // Whether the worker has been connected
 export let workerConnected = false

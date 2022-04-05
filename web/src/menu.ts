@@ -1,5 +1,6 @@
 import {Pos, Rect} from './common';
-import * as Util from "./util";
+import {canvas, drawSprite} from "./draw";
+import {cloneObj} from "./util";
 
 export type Hitbox = Rect
 
@@ -15,7 +16,7 @@ const biggestElementByField = (elements: Array<Element>, field: string) =>
         prev.sprite[field] * prev.scale > curr.sprite[field] * curr.scale ? prev : curr)
 
 function getAbsPos(x, y: number) {
-    const rect = Util.ctx.canvas.getBoundingClientRect()
+    const rect = canvas.getBoundingClientRect()
     return [Math.round(x - rect.left), Math.round(y - rect.top)]
 }
 
@@ -49,8 +50,8 @@ export default class Menu {
             bounds = {
                 x: 0,
                 y: 0,
-                w: Util.ctx.canvas.width,
-                h: Util.ctx.canvas.height,
+                w: canvas.width,
+                h: canvas.height,
             }
         }
 
@@ -86,7 +87,7 @@ export default class Menu {
                     this.elementHitboxes.set(element, hitbox)
                 }
 
-                let sprite = Util.cloneObj(element.sprite)
+                let sprite = cloneObj(element.sprite)
                 // If this element is being hovered over (and has a sprite)
                 if (element === this.hoveredElement && "hoveredSprite" in element) {
                     // We're assuming the hovered sprite is the same size here
@@ -95,9 +96,7 @@ export default class Menu {
                 }
 
                 // Draw the element
-                Util.ctx.drawImage(Util.spritesheet,
-                    sprite.x, sprite.y, sprite.w, sprite.h,
-                    hitbox.x, hitbox.y, hitbox.w, hitbox.h)
+                drawSprite(sprite, hitbox)
 
                 // Move the y down
                 y += actualHeight * 1.5

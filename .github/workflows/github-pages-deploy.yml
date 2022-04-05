@@ -20,15 +20,19 @@ jobs:
         run: |
           wget https://github.com/tinygo-org/tinygo/releases/download/v0.17.0/tinygo_0.17.0_amd64.deb
           sudo apt install ./tinygo_0.17.0_amd64.deb
-          cp /usr/local/lib/tinygo/targets/wasm_exec.js ./web/js/vendor/wasm_exec.js
+          cp /usr/local/lib/tinygo/targets/wasm_exec.js ./web/vendor/wasm_exec.js
 
-      - name: Build
+      - name: Build Go
         run: |
           mkdir ./web/wasm
           tinygo build -o ./web/wasm/app.wasm -target wasm --no-debug ./cmd/web/main.go
+
+      - name: Build webpack
+        run: |
+          (cd web && npm ci && npm run build)
 
       - name: Deploy
         uses: JamesIves/github-pages-deploy-action@4.1.1
         with: 
           branch: gh-pages
-          folder: web
+          folder: web/dist

@@ -1,5 +1,6 @@
 import {spritesheetLoaded, canvas, ctx} from './draw';
 import * as MainMenu from "./main-menu"
+import '../assets/styles.css'
 
 // Once the spritesheet has loaded
 spritesheetLoaded.then(() => {

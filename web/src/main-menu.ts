@@ -1,73 +1,38 @@
 import Menu, {Element} from "./menu";
 import * as Game from "./game";
-import {canvas, ctx, limiter, ROW_HEIGHT} from './util';
+import {canvas, ctx, SPRITES} from "./draw";
+import {consoleLog, limiter} from './util';
+import {pos} from "./common";
 
 const TITLE: Element = {
-    sprite: {
-        x: 0,
-        y: 10,
-        w: 95,
-        h: ROW_HEIGHT
-    },
+    sprite: SPRITES.MAIN_MENU.TITLE,
     scale: 1,
 }
 
 const EASY_BUTTON: Element = {
-    sprite: {
-        x: 0,
-        y: 20,
-        w: 26,
-        h: ROW_HEIGHT
-    },
-    hoveredSprite: {
-        x: 26,
-        y: 20
-    },
+    sprite: SPRITES.MAIN_MENU.EASY,
+    hoveredSprite: pos(SPRITES.MAIN_MENU.EASY_HOVERED),
     scale: 1.25,
     interactable: true
 }
 
 const MEDIUM_BUTTON: Element = {
-    sprite: {
-        x: 0,
-        y: 30,
-        w: 35,
-        h: ROW_HEIGHT
-    },
-    hoveredSprite: {
-        x: 35,
-        y: 30
-    },
+    sprite: SPRITES.MAIN_MENU.MEDIUM,
+    hoveredSprite: pos(SPRITES.MAIN_MENU.MEDIUM_HOVERED),
     scale: 1.25,
     interactable: true
 }
 
 const HARD_BUTTON: Element = {
-    sprite: {
-        x: 0,
-        y: 40,
-        w: 25,
-        h: ROW_HEIGHT
-    },
-    hoveredSprite: {
-        x: 25,
-        y: 40
-    },
+    sprite: SPRITES.MAIN_MENU.HARD,
+    hoveredSprite: pos(SPRITES.MAIN_MENU.HARD_HOVERED),
     scale: 1.25,
     interactable: true
 }
 
 const CUSTOM_BUTTON: Element = {
-    sprite: {
-        x: 0,
-        y: 50,
-        w: 38,
-        h: ROW_HEIGHT
-    },
-    hoveredSprite: {
-        x: 38,
-        y: 50
-    },
+    sprite: SPRITES.MAIN_MENU.CUSTOM,
+    hoveredSprite: pos(SPRITES.MAIN_MENU.CUSTOM_HOVERED),
     scale: 1.25,
     interactable: false // todo
 }

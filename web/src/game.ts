@@ -1,8 +1,9 @@
 import * as worker from './worker-helper'
 import {CLOSE_BUTTON} from "./modal";
 import RetryModal from "./retry-modal"
-import {canvas, ctx, spritesheet, TILE_SIZE} from './util';
+import {canvas, ctx, spritesheet, TILE_SIZE} from './draw';
 import {Pos} from './common';
+import {consoleLog, limiter} from "./util";
 
 // Constant for the draw size of a tile
 const TILE_DRAW_SIZE = 30
@@ -80,7 +81,7 @@ function toWorldPos(x, y: number): Pos {
 }
 
 // Create the minesweeper game
-export function create(width, height, numMines) {
+export function create(width, height, numMines: number) {
     activeModal = {
         modal: null,
         hidden: true
@@ -158,11 +159,11 @@ export async function draw() {
 }
 
 // The draw function with a limiter, to prevent flickering when resizing
-const drawWithLimit = Util.limiter(draw, 100)
+const drawWithLimit = limiter(draw, 100)
 
 function handleState(stateData) {
     if (stateData.state === GAME_STATES.LOSS) {
-        Util.consoleLog("Loss detected, displaying retry modal")
+        consoleLog("Loss detected, displaying retry modal")
         setTimeout(async () => {
             // Display the modal
             activeModal.modal = new RetryModal()
@@ -203,7 +204,7 @@ export function deregisterEvents() {
 }
 
 // Callback function to handle 'wheel' events, for zooming
-function handleWheel(event) {
+function handleWheel(event : WheelEvent) {
     // Change the camera's scale
     const newScale = camera.scale + (event.deltaY * -0.005)
     // Only change the scale if it's valid
@@ -212,6 +213,7 @@ function handleWheel(event) {
         // Redraw
         draw()
     }
+    // todo zoom at mouse position
 }
 
 let pointerDownEvent = null
@@ -322,6 +324,8 @@ function handlePointerMove(event) {
             // Restrict the scale
             camera.scale = Math.max(camera.scale, MIN_SCALE)
             camera.scale = Math.min(camera.scale, MAX_SCALE)
+
+            // todo zoom at touch position
         }
 
         // Set the distance
