@@ -13,12 +13,12 @@ export function cloneObj(o) {
     return JSON.parse(JSON.stringify(o))
 }
 
-const timeoutIdForFunc = new Map<Function, number>()
+const timeoutIdForFunc = new Map<TimerHandler, number>()
 
 // Returns a function that only calls func if there have
 // been no calls to the returned function in delay milliseconds.
 // Useful for preventing excessive calls from event handlers (e.g. not drawing on every resize event)
-export function limiter(func: Function, delay: number) {
+export function limiter(func: TimerHandler, delay: number) {
     return () => {
         const id = timeoutIdForFunc.get(func)
         if (id) {

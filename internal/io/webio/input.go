@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	ms "github.com/bhollier/minesweeper/pkg/minesweeper"
+	"strconv"
 	"syscall/js"
 	"time"
 )
@@ -86,7 +87,21 @@ func appearancePayload(appearance [][]ms.TileType) []interface{} {
 	for y, row := range appearance {
 		responseRow := make([]interface{}, len(row))
 		for x, tile := range row {
-			responseRow[x] = int(tile)
+			var tileStr string
+			switch tile {
+			case ms.TileTypeEmpty:
+				tileStr = "EMPTY"
+			case ms.TileTypeFlag:
+				tileStr = "FLAG"
+			case ms.TileTypeHidden:
+				tileStr = "HIDDEN"
+			case ms.TileTypeMine:
+				tileStr = "MINE"
+			case ms.TileType1, ms.TileType2, ms.TileType3, ms.TileType4,
+				ms.TileType5, ms.TileType6, ms.TileType7, ms.TileType8:
+				tileStr = strconv.Itoa(int(tile) - int(ms.TileType1) + 1)
+			}
+			responseRow[x] = tileStr
 		}
 		payload[y] = responseRow
 	}

@@ -1,5 +1,5 @@
-import {consoleLog} from './util';
 import {Rect} from './common';
+import {consoleLog} from './util';
 
 // Constant for the size of a tile in the spritesheet
 export const TILE_SIZE = 10
@@ -9,7 +9,7 @@ export const ROW_HEIGHT = TILE_SIZE
 
 export const SPRITES = {
     TILES: {
-        UNCOVERED: {x: 0, y: 0, w: TILE_SIZE, h: TILE_SIZE} as Rect,
+        EMPTY: {x: 0, y: 0, w: TILE_SIZE, h: TILE_SIZE} as Rect,
         1: {x: 10, y: 0, w: TILE_SIZE, h: TILE_SIZE} as Rect,
         2: {x: 20, y: 0, w: TILE_SIZE, h: TILE_SIZE} as Rect,
         3: {x: 30, y: 0, w: TILE_SIZE, h: TILE_SIZE} as Rect,
@@ -19,9 +19,14 @@ export const SPRITES = {
         7: {x: 70, y: 0, w: TILE_SIZE, h: TILE_SIZE} as Rect,
         8: {x: 80, y: 0, w: TILE_SIZE, h: TILE_SIZE} as Rect,
         MINE: {x: 90, y: 0, w: TILE_SIZE, h: TILE_SIZE} as Rect,
-        COVERED: {x: 100, y: 0, w: TILE_SIZE, h: TILE_SIZE} as Rect,
+        HIDDEN: {x: 100, y: 0, w: TILE_SIZE, h: TILE_SIZE} as Rect,
         FLAG: {x: 110, y: 0, w: TILE_SIZE, h: TILE_SIZE} as Rect,
         CLOSE: {x: 120, y: 0, w: TILE_SIZE, h: TILE_SIZE} as Rect
+    },
+
+    MODAL: {
+        BACK: {x: 0, y: 80, w: 24, h: ROW_HEIGHT} as Rect,
+        BACK_HOVERED: {x: 24, y: 80, w: 24, h: ROW_HEIGHT} as Rect
     },
 
     MAIN_MENU: {
@@ -36,10 +41,17 @@ export const SPRITES = {
         CUSTOM_HOVERED: {x: 38, y: 50, w: 26, h: ROW_HEIGHT} as Rect
     },
 
-    RETRY_MENU: {
-        TITLE: {x: 0, y: 60, w: 45, h: ROW_HEIGHT} as Rect
-    }
+    RETRY_MODAL: {
+        TITLE: {x: 0, y: 60, w: 45, h: ROW_HEIGHT} as Rect,
+        RETRY: {x: 0, y: 70, w: 30, h: ROW_HEIGHT} as Rect,
+        RETRY_HOVERED: {x: 30, y: 70, w: 30, h: ROW_HEIGHT} as Rect,
+    },
 
+    SUCCESS_MODAL: {
+        TITLE: {x: 0, y: 90, w: 52, h: ROW_HEIGHT} as Rect,
+        RESET: {x: 0, y: 100, w: 53, h: ROW_HEIGHT} as Rect,
+        RESET_HOVERED: {x: 53, y: 100, w: 53, h: ROW_HEIGHT} as Rect,
+    }
 }
 
 // The canvas
@@ -48,9 +60,9 @@ export const canvas = document.getElementById("canvas") as HTMLCanvasElement
 // The graphical context to draw to
 export const ctx = canvas.getContext('2d')
 
-export const spritesheet = new Image()
+const spritesheet = new Image()
 
-export const spritesheetLoaded = new Promise<void>(resolve => {
+const spritesheetLoaded = new Promise<void>(resolve => {
     spritesheet.addEventListener('load', () => {
         consoleLog("Finished loading spritesheet")
         resolve()
@@ -59,7 +71,7 @@ export const spritesheetLoaded = new Promise<void>(resolve => {
 
 spritesheet.src = new URL('../assets/spritesheet.png', import.meta.url).toString()
 
-export function clear(rect?: Rect) {
+export async function clear(rect?: Rect) {
     if (!rect) {
         rect = {
             x: 0,
@@ -71,8 +83,10 @@ export function clear(rect?: Rect) {
     ctx.clearRect(rect.x, rect.y, rect.w, rect.h)
 }
 
-export function drawSprite(sprite: Rect, drawRect: Rect) {
-    ctx.drawImage(spritesheet,
-        sprite.x, sprite.y, sprite.w, sprite.h,
-        drawRect.x, drawRect.y, drawRect.w, drawRect.h)
+export async function drawSprite(sprite: Rect, drawRect: Rect) {
+    await spritesheetLoaded.then(() => {
+        ctx.drawImage(spritesheet,
+            sprite.x, sprite.y, sprite.w, sprite.h,
+            drawRect.x, drawRect.y, drawRect.w, drawRect.h)
+    })
 }

@@ -1,13 +1,22 @@
 import Menu, {Element} from "./menu"
 import {canvas, ctx, drawSprite, SPRITES} from "./draw";
-import {Rect} from './common';
+import {pos, Rect} from './common';
 
 // THe background of the modal is made up of a grid of 12x12 tiles
 const MODAL_GRID_SIZE = 10
 
 export const CLOSE_BUTTON: Element = {
+    id: "modal.close_button",
     sprite: SPRITES.TILES.CLOSE,
     scale: 1
+}
+
+export const BACK_BUTTON: Element = {
+    id: "modal.back_button",
+    sprite: SPRITES.MODAL.BACK,
+    hoveredSprite: pos(SPRITES.MODAL.BACK_HOVERED),
+    scale: 1.25,
+    interactable: true
 }
 
 export default class Modal extends Menu {
@@ -15,9 +24,9 @@ export default class Modal extends Menu {
         super(elements)
     }
 
-    async draw() : Promise<void> {
+    async draw() {
         // Draw the background in a promise
-        return new Promise<Rect>(resolve => {
+        await new Promise<Rect>(resolve => {
             // The canvas width and height
             const w = canvas.width, h = canvas.height
 
@@ -43,7 +52,13 @@ export default class Modal extends Menu {
                         w: tileSize, h: tileSize,
                     }
 
-                    let sprite = SPRITES.TILES.UNCOVERED
+                    // todo draw the background properly
+                    let sprite = {
+                        // Pick the center pixel
+                        x: SPRITES.TILES.EMPTY.w / 2,
+                        y: SPRITES.TILES.EMPTY.h / 2,
+                        w: 1, h: 1
+                    } as Rect
                     // If the tile should be a corner
                     if (x === 0 || x === MODAL_GRID_SIZE - 1 ||
                         y === 0 || y === MODAL_GRID_SIZE - 1) {
@@ -52,10 +67,10 @@ export default class Modal extends Menu {
                             // The element is the close button
                             sprite = CLOSE_BUTTON.sprite
                             // Add the hitbox to the menu
-                            this.elementHitboxes.set(CLOSE_BUTTON, hitbox)
+                            this.elementHitboxes.set(CLOSE_BUTTON.id, hitbox)
 
                         } else {
-                            sprite = SPRITES.TILES.COVERED
+                            sprite = SPRITES.TILES.HIDDEN
                         }
                     }
 

@@ -1,10 +1,12 @@
 import {Pos, Rect} from './common';
 import {canvas, drawSprite} from "./draw";
 import {cloneObj} from "./util";
+import EventManager from "./event-manager";
 
 export type Hitbox = Rect
 
 export type Element = {
+    id: string
     sprite: Rect,
     hoveredSprite?: Pos,
     scale: number,
@@ -25,22 +27,84 @@ function intersect(x, y: number, hitbox: Hitbox) {
         x < hitbox.x + hitbox.w && y < hitbox.y + hitbox.h
 }
 
-// Class for a very simple menu, where each "element" is drawn top down, equally spaced
-export default class Menu {
-    #elements: Array<Element>
-    #tallestElement: Element
-    #longestElement: Element
+export type ElementPressEvent = {
+    pressedElement: string
+}
 
-    elementHitboxes: Map<Element, Hitbox>
-    hoveredElement: Element | null
+export type ElementHoveredEvent = {
+    hoveredElement: string | null
+}
+
+interface MenuEventMap {
+    "press": ElementPressEvent
+    "hover": ElementHoveredEvent
+}
+
+// Class for a very simple menu, where each "element" is drawn top down, equally spaced
+export default class Menu extends EventManager<MenuEventMap> {
+    private elements: Array<Element>
+    private tallestElement: Element
+    private longestElement: Element
+
+    protected elementHitboxes: Map<string, Hitbox>
+    protected hoveredElement: string | null
+
+    private readonly handlePointerMove
+    private readonly handlePointerDown
 
     constructor(elements: Array<Element>) {
-        this.#elements = elements
-        this.#tallestElement = biggestElementByField(elements, "h")
-        this.#longestElement = biggestElementByField(elements, "w")
+        super()
+        this.elements = elements
+        this.tallestElement = biggestElementByField(elements, "h")
+        this.longestElement = biggestElementByField(elements, "w")
 
         this.elementHitboxes = new Map()
         this.hoveredElement = null
+
+        this.handlePointerMove = (event: PointerEvent) => {
+            // Calculate the absolute X and Y of the button press
+            const [x, y] = getAbsPos(event.clientX, event.clientY)
+            // Iterate over the menu elements
+            for (let [element, hitbox] of this.elementHitboxes.entries()) {
+                // If the pointer intersected the menu item
+                if (intersect(x, y, hitbox)) {
+                    // If this is newly hovered
+                    if (this.hoveredElement !== element) {
+                        // Set the element
+                        this.hoveredElement = element
+                        this.callEventListeners("hover", {
+                            hoveredElement: element
+                        })
+                    }
+                    return
+                }
+            }
+            // If an element is being hovered over (but not anymore)
+            if (this.hoveredElement !== null) {
+                // Reset the hovered element
+                this.hoveredElement = null
+                this.callEventListeners("hover", {
+                    hoveredElement: null
+                })
+            }
+        }
+
+        this.handlePointerDown = (event: PointerEvent) => {
+            // Calculate the absolute X and Y of the button press
+            const [x, y] = getAbsPos(event.clientX, event.clientY)
+            // Iterate over the menu elements
+            for (let [element, hitbox] of this.elementHitboxes.entries()) {
+                // If the pointer intersected the menu item
+                if (intersect(x, y, hitbox)) {
+                    this.callEventListeners("press", {
+                        pressedElement: element
+                    })
+                }
+            }
+            return null
+        }
+
+        this.registerEvents()
     }
 
     async draw(bounds?: Rect): Promise<void> {
@@ -58,19 +122,19 @@ export default class Menu {
         // Determine the scale
         let scale: number
         // If the canvas is landscape
-        if (bounds.w > bounds.h) {
+        if (bounds.w >= bounds.h) {
             // Scale so the elements are evenly spaced by height
             // todo could break for menus with too few elements
-            scale = (bounds.h * (0.5 / this.#elements.length)) / this.#tallestElement.sprite.h
+            scale = (bounds.h * (0.5 / this.elements.length)) / this.tallestElement.sprite.h
         } else {
             // Otherwise scale so the longest element is 90% the width of the canvas
             // todo could break for menus with too many elements
-            scale = (bounds.w * 0.9) / this.#longestElement.sprite.w
+            scale = (bounds.w * 0.9) / this.longestElement.sprite.w
         }
 
         return new Promise<void>(resolve => {
-            let y = bounds.y + (this.#tallestElement.sprite.h * scale * 0.5)
-            this.#elements.forEach(element => {
+            let y = bounds.y + (this.tallestElement.sprite.h * scale * 0.5)
+            this.elements.forEach(element => {
                 const actualWidth = element.sprite.w * element.scale * scale
                 const actualHeight = element.sprite.h * element.scale * scale
 
@@ -84,12 +148,12 @@ export default class Menu {
 
                 if (element.interactable) {
                     // Add the element's hitbox to the map
-                    this.elementHitboxes.set(element, hitbox)
+                    this.elementHitboxes.set(element.id, hitbox)
                 }
 
                 let sprite = cloneObj(element.sprite)
                 // If this element is being hovered over (and has a sprite)
-                if (element === this.hoveredElement && "hoveredSprite" in element) {
+                if (element.id === this.hoveredElement && "hoveredSprite" in element) {
                     // We're assuming the hovered sprite is the same size here
                     sprite.x = element.hoveredSprite.x
                     sprite.y = element.hoveredSprite.y
@@ -106,49 +170,13 @@ export default class Menu {
         })
     }
 
-    // Gets the element that was pressed by the pointer event. Returns the element
-    // property object of the button that was pressed (or null if none were pressed)
-    pressedElement(event: PointerEvent): Element | null {
-        // Calculate the absolute X and Y of the button press
-        const [x, y] = getAbsPos(event.clientX, event.clientY)
-        // Iterate over the menu elements
-        for (let [element, hitbox] of this.elementHitboxes.entries()) {
-            // If the pointer intersected the menu item
-            if (intersect(x, y, hitbox)) {
-                // Return the element
-                return element
-            }
-        }
-        return null
+    public registerEvents() {
+        window.addEventListener("pointermove", this.handlePointerMove)
+        window.addEventListener("pointerdown", this.handlePointerDown)
     }
 
-    // Returns whether the given pointer event has resulted in the user hovering over a different button.
-    // Usually this should be called on pointermove events, and if it returns true the menu should be redrawn
-    pointerHoveringNewElement(event: PointerEvent): boolean {
-        // Calculate the absolute X and Y of the button press
-        const [x, y] = getAbsPos(event.clientX, event.clientY)
-        // Iterate over the menu elements
-        for (let [element, hitbox] of this.elementHitboxes.entries()) {
-            // If the pointer intersected the menu item
-            if (intersect(x, y, hitbox)) {
-                // If this is newly hovered
-                if (this.hoveredElement !== element) {
-                    // Set the element
-                    this.hoveredElement = element
-                    // Redraw
-                    return true
-                }
-                // Otherwise don't redraw
-                return false
-            }
-        }
-        // If an element is being hovered over (but not anymore)
-        if (this.hoveredElement !== null) {
-            // Reset the hovered element
-            this.hoveredElement = null
-            // Redraw
-            return true
-        }
-        return false
+    public deregisterEvents() {
+        window.removeEventListener("pointermove", this.handlePointerMove)
+        window.removeEventListener("pointerdown", this.handlePointerDown)
     }
 }
