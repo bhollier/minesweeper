@@ -1,9 +1,7 @@
 package minesweeper
 
 import (
-	"encoding/gob"
 	"fmt"
-	"io"
 	"math/rand"
 	"time"
 )
@@ -248,6 +246,9 @@ type gameExportedFields struct {
 	ST      time.Time
 }
 
+// todo TinyGo doesn't support encoding/gob
+//  https://tinygo.org/docs/reference/lang-support/stdlib/#encodinggob
+/*
 // Save the state of the game into the given io.Writer
 func (g *Game) Save(w io.Writer) error {
 	enc := gob.NewEncoder(w)
@@ -267,6 +268,7 @@ func Load(r io.Reader) (*Game, error) {
 		g.F, g.S, g.ST,
 	}, err
 }
+*/
 
 type tileAndPos struct {
 	X, Y int

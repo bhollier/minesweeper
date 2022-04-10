@@ -1,8 +1,6 @@
 package webio
 
 import (
-	"bytes"
-	"encoding/hex"
 	"fmt"
 	ms "github.com/bhollier/minesweeper/pkg/minesweeper"
 	"strconv"
@@ -52,10 +50,10 @@ func (io *WebIO) eventHandler(_ js.Value, args []js.Value) interface{} {
 		io.handleUncover(msg)
 	case "flag":
 		io.handleFlag(msg)
-	case "save":
+	/*case "save":
 		io.handleSave(msg)
 	case "load":
-		io.handleLoad(msg)
+		io.handleLoad(msg)*/
 	default:
 		sendError(msg, fmt.Errorf("Unknown cmd "+msg.Cmd))
 	}
@@ -135,6 +133,7 @@ func (io *WebIO) handleFlag(msg Message) {
 	sendSuccess(msg)
 }
 
+/*
 func (io *WebIO) handleSave(msg Message) {
 	consoleLog("Received '" + msg.Cmd + "'")
 	// Copy the game
@@ -175,3 +174,4 @@ func (io *WebIO) handleLoad(msg Message) {
 	// Send OK
 	sendSuccess(msg)
 }
+*/
