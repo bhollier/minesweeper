@@ -119,17 +119,14 @@ export default class Menu extends EventManager<MenuEventMap> {
             }
         }
 
-        // Determine the scale
-        let scale: number
-        // If the canvas is landscape
-        if (bounds.w >= bounds.h) {
-            // Scale so the elements are evenly spaced by height
-            // todo could break for menus with too few elements
-            scale = (bounds.h * (0.5 / this.elements.length)) / this.tallestElement.sprite.h
-        } else {
-            // Otherwise scale so the longest element is 90% the width of the canvas
-            // todo could break for menus with too many elements
-            scale = (bounds.w * 0.9) / this.longestElement.sprite.w
+        // First, scale so the elements are evenly spaced by height
+        let scale = (bounds.h * (0.5 / this.elements.length)) /
+            (this.tallestElement.sprite.h * this.tallestElement.scale)
+
+        // If the longest element would be too long
+        if (scale * this.longestElement.sprite.w * this.longestElement.scale >= bounds.w * 0.9) {
+            // Scale so the longest element is 90% the width of the canvas
+            scale = (bounds.w * 0.9) / (this.longestElement.sprite.w * this.longestElement.scale)
         }
 
         return new Promise<void>(resolve => {
