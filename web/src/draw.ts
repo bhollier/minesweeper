@@ -2,10 +2,10 @@ import {Rect} from './common';
 import {consoleLog} from './util';
 
 // Constant for the size of a tile in the spritesheet
-export const TILE_SIZE = 10
+export const TILE_SIZE = 10;
 
 // Constant for the height of a row in the spritesheet
-export const ROW_HEIGHT = TILE_SIZE
+export const ROW_HEIGHT = TILE_SIZE;
 
 export const SPRITES = {
     TILES: {
@@ -52,24 +52,24 @@ export const SPRITES = {
         RESET: {x: 0, y: 100, w: 53, h: ROW_HEIGHT} as Rect,
         RESET_HOVERED: {x: 53, y: 100, w: 53, h: ROW_HEIGHT} as Rect,
     }
-}
+};
 
 // The canvas
-export const canvas = document.getElementById("canvas") as HTMLCanvasElement
+export const canvas = document.getElementById('canvas') as HTMLCanvasElement;
 
 // The graphical context to draw to
-export const ctx = canvas.getContext('2d')
+export const ctx = canvas.getContext('2d');
 
-const spritesheet = new Image()
+const spritesheet = new Image();
 
 const spritesheetLoaded = new Promise<void>(resolve => {
     spritesheet.addEventListener('load', () => {
-        consoleLog("Finished loading spritesheet")
-        resolve()
-    })
-})
+        consoleLog('Finished loading spritesheet');
+        resolve();
+    });
+});
 
-spritesheet.src = new URL('../assets/spritesheet.png', import.meta.url).toString()
+spritesheet.src = new URL('../assets/spritesheet.png', import.meta.url).toString();
 
 export async function clear(rect?: Rect) {
     if (!rect) {
@@ -78,15 +78,15 @@ export async function clear(rect?: Rect) {
             y: 0,
             w: canvas.width,
             h: canvas.height
-        }
+        };
     }
-    ctx.clearRect(rect.x, rect.y, rect.w, rect.h)
+    ctx.clearRect(rect.x, rect.y, rect.w, rect.h);
 }
 
 export async function drawSprite(sprite: Rect, drawRect: Rect) {
     await spritesheetLoaded.then(() => {
         ctx.drawImage(spritesheet,
             sprite.x, sprite.y, sprite.w, sprite.h,
-            drawRect.x, drawRect.y, drawRect.w, drawRect.h)
-    })
+            drawRect.x, drawRect.y, drawRect.w, drawRect.h);
+    });
 }
