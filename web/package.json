@@ -6,6 +6,7 @@
   "scripts": {
     "start": "webpack serve --mode=development --open",
     "build": "webpack --mode=production",
+    "install-android": "webpack --mode=production --config ./android-webpack.config.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "lint": "eslint ./src",
     "lint-fix": "eslint --fix ./src"
