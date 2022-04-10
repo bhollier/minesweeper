@@ -3,12 +3,17 @@
 A very overcomplicated minesweeper clone. The backend is implemented entirely in 
 Go, with a [pixel](https://github.com/faiface/pixel) and a web frontend. The
 pixel frontend is very simplistic and exists purely for debugging purposes (for 
-now). The web frontend is much more sophisticated, it is compiled into Web 
-Assembly and communicates with Javascript using events.
+now). The web frontend is much more sophisticated, there are menus to select 
+difficulties, and the controls work with both a mouse and touchscreen
 
-Take a look at the web version for yourself [here](https://bhollier.github.io/minesweeper/index.html)
+Take a look at the web version for yourself [here](https://bhollier.github.io/minesweeper/index.html) 
+(and the staging version [here](https://bhollier.github.io/minesweeper/stage/index.html))
 
-![Screenshot of the minesweeper clone running in a browser](screenshot.png)
+| Main Menu                                   | Gameplay                                                                     |
+|---------------------------------------------|------------------------------------------------------------------------------|
+| ![Screenshot of main menu](screenshot1.png) | ![Screenshot of the minesweeper clone running in a browser](screenshot2.png) |
+
+
 
 ### Running in a window
 
@@ -33,16 +38,15 @@ repo:
 GOOS=js GOARCH=wasm go build -o ./web/wasm/app.wasm cmd/web/main.go
 ```
 
-Now you can start a web server in `web`. If you don't have a webserver, a very 
-simple one is included:
+The frontend uses NPM and webpack, so install and start:
 
 ```shell
-go run cmd/web/main.go
+npm install
+npm start
 ```
 
-This will serve the web frontend at http://localhost:8080. Importantly, all 
-resources from that webserver are served with 'Cache-Control' set to 'no-cache', 
-to aid with debugging
+This should install the dependencies and serve the webpack in development mode. 
+If any files are changed the bundle should be recompiled automatically.
 
 #### tinygo
 
@@ -53,9 +57,23 @@ can be reduced down to ~150KB by compiling with [tinygo](https://tinygo.org/):
 tinygo -o ./web/wasm/app.wasm -target wasm --no-debug cmd/web/main.go
 ```
 
-The `wasm_exec.js` file in ./web/js also needs to be replaced with the tinygo
+The `wasm_exec.js` file in ./web/vendor also needs to be replaced with the tinygo
 version. On debian systems, this can be done with the following command:
 
 ```shell
-cp /usr/local/lib/tinygo/targets/wasm_exec.js ./web/js/wasm_exec.js
+cp /usr/local/lib/tinygo/targets/wasm_exec.js ./web/vendor/wasm_exec.js
 ```
+
+### Todo list:
+- Proper pixel frontend
+- Saving/loading
+- Custom difficulty
+- Infinite mode
+- Peer-to-peer multiplayer?
+- Extra cosmetic improvements:
+  - Display a bar on top, with the current time and the number of remaining mines
+  - Display elapsed time in success/retry modal
+  - Zoom at the position of the touch event, rather than at the center
+- Optimisations:
+  - Request only the "appearance" data the frontend needs
+  - Populate the minefield faster using a proper shuffle
