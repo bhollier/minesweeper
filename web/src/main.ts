@@ -12,6 +12,13 @@ function fullscreenCanvas() {
     canvas.height = window.innerHeight;
 
     ctx.imageSmoothingEnabled = false;
+
+    /* eslint-disable @typescript-eslint/ban-ts-comment */
+    // @ts-ignore
+    ctx.webkitImageSmoothingEnabled = false;
+    // @ts-ignore
+    ctx.mozImageSmoothingEnabled = false;
+    /* eslint-enable @typescript-eslint/ban-ts-comment */
 }
 
 // Add an event handler to resize the canvas
