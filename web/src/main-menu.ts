@@ -34,13 +34,14 @@ export const HARD_BUTTON: Element = {
     interactable: true
 };
 
+/* todo implement custom difficulty
 export const CUSTOM_BUTTON: Element = {
     id: 'menu.main.custom_button',
     sprite: SPRITES.MAIN_MENU.CUSTOM,
     hoveredSprite: pos(SPRITES.MAIN_MENU.CUSTOM_HOVERED),
     scale: 1.25,
-    interactable: false // todo
-};
+    interactable: false
+};*/
 
 // The elements, in order of how they're displayed on screen (top down)
 const ELEMENTS: Array<Element> = [TITLE, EASY_BUTTON, MEDIUM_BUTTON, HARD_BUTTON/*, CUSTOM_BUTTON*/];
