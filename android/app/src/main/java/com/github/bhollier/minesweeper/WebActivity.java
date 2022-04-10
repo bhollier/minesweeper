@@ -7,10 +7,6 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import android.content.res.AssetManager;
 import android.os.Bundle;
-import android.os.Handler;
-import android.util.Log;
-import android.view.MotionEvent;
-import android.view.View;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
@@ -20,7 +16,6 @@ import android.webkit.WebViewClient;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.List;
 
 /**
  * An example full-screen activity that shows and hides the system UI (i.e.
@@ -70,7 +65,7 @@ public class WebActivity extends AppCompatActivity {
                 } catch (IOException e) {
                     e.printStackTrace();
                     ByteArrayInputStream result = new ByteArrayInputStream(
-                            ("URL: " + path + ", Error: " + e.toString()).getBytes());
+                            ("URL: " + path + ", Error: " + e).getBytes());
                     return new WebResourceResponse(
                             "text/plain", "utf-8", result);
                 }
