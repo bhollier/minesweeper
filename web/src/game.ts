@@ -120,8 +120,14 @@ export default class Game {
     }
 
     public async draw() {
+        // todo only request the visible mines (with the camera)
+        const rect = {
+            x: 0, y: 0,
+            w: this.fieldSize.w, h: this.fieldSize.h
+        };
+
         // Request the appearance of the board from Go
-        await worker.postMessage('appearance')
+        await worker.postMessage('appearance', rect)
             // Then draw it
             .then(this.drawAppearance.bind(this))
             // Then draw the modal over top (if active)

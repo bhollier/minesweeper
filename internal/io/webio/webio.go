@@ -9,7 +9,7 @@ import (
 
 // WebIO is an IO for minesweeper with javascript
 type WebIO struct {
-	game *ms.Game
+	game ms.Game
 }
 
 func New() *WebIO {

@@ -62,18 +62,37 @@ func (io *WebIO) eventHandler(_ js.Value, args []js.Value) interface{} {
 
 func (io *WebIO) handleInit(msg Message) {
 	consoleLog("Received '" + msg.Cmd + "'")
-	width := msg.Data.Get("width").Int()
-	height := msg.Data.Get("height").Int()
-	mines := msg.Data.Get("mines").Int()
-	consoleLogF("Creating game (width = %d, height = %d, mines = %d)",
-		width, height, mines)
-	// Create a new game with the options
-	g, err := ms.NewGame(width, height, mines)
-	if err != nil {
-		consoleLog("Error:", err)
-		sendError(msg, err)
-		return
+	var g ms.Game
+	// If a mine density was given, the minesweeper field is infinite
+	if !msg.Data.Get("mineDensity").IsUndefined() {
+		mineDensity := msg.Data.Get("mineDensity").Int()
+		consoleLogF("Creating infinite game (mineDensity = %d)", mineDensity)
+		// Create a new game with the options
+		var err error
+		g, err = ms.NewInfiniteGame(mineDensity)
+		if err != nil {
+			consoleLog("Error:", err)
+			sendError(msg, err)
+			return
+		}
+
+		// Otherwise, assume it's a normal, finite minesweeper game
+	} else {
+		width := msg.Data.Get("width").Int()
+		height := msg.Data.Get("height").Int()
+		mines := msg.Data.Get("mines").Int()
+		consoleLogF("Creating game (width = %d, height = %d, mines = %d)",
+			width, height, mines)
+		// Create a new game with the options
+		var err error
+		g, err = ms.NewGame(width, height, mines)
+		if err != nil {
+			consoleLog("Error:", err)
+			sendError(msg, err)
+			return
+		}
 	}
+
 	// If all goes well, set the game to the new one
 	io.game = g
 	sendSuccess(msg)
@@ -114,21 +133,17 @@ func statePayload(s ms.GameState, timer time.Duration) map[string]interface{} {
 }
 
 func (io *WebIO) handleAppearance(msg Message) {
-	sendSuccessWithPayload(msg, appearancePayload(io.game.Appearance()))
+	x, y, w, h := msg.Data.Get("x").Int(), msg.Data.Get("y").Int(),
+		msg.Data.Get("w").Int(), msg.Data.Get("h").Int()
+	sendSuccessWithPayload(msg, appearancePayload(io.game.Appearance(x, y, w, h)))
 }
 
 func (io *WebIO) handleUncover(msg Message) {
-	if io.game == nil {
-		return
-	}
 	io.game.Uncover(msg.Data.Get("x").Int(), msg.Data.Get("y").Int())
 	sendSuccessWithPayload(msg, statePayload(io.game.State(), io.game.SinceStart()))
 }
 
 func (io *WebIO) handleFlag(msg Message) {
-	if io.game == nil {
-		return
-	}
 	io.game.Flag(msg.Data.Get("x").Int(), msg.Data.Get("y").Int())
 	sendSuccess(msg)
 }

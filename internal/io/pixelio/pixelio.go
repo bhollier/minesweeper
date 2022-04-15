@@ -12,7 +12,7 @@ import (
 
 // PixelIO is an IO for minesweeper with the pixel graphics library
 type PixelIO struct {
-	game        *ms.Game
+	game        ms.Game
 	window      *pixelgl.Window
 	spritesheet *spritesheet
 	batch       *pixel.Batch
@@ -26,7 +26,8 @@ func New() *PixelIO {
 func (io *PixelIO) Run() {
 	var err error
 	rand.Seed(time.Now().Unix())
-	io.game, err = ms.NewGame(16, 16, 40)
+	w, h := 16, 16
+	io.game, err = ms.NewGame(w, h, 40)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -41,7 +42,6 @@ func (io *PixelIO) Run() {
 
 		// Create a window
 		log.Print("Creating window...")
-		w, h := io.game.Size()
 		io.window, err = pixelgl.NewWindow(pixelgl.WindowConfig{
 			Title: "Minesweeper",
 			Bounds: pixel.R(0, 0,
@@ -58,7 +58,7 @@ func (io *PixelIO) Run() {
 			&pixel.TrianglesData{}, io.spritesheet.SheetPicture)
 
 		// Draw to the batch
-		io.drawToBatch(io.game.Appearance())
+		io.drawToBatch(io.game.Appearance(0, 0, w, h))
 
 		// Start the main loop
 		for !io.window.Closed() {
@@ -71,7 +71,7 @@ func (io *PixelIO) Run() {
 				// Uncover the tile
 				io.game.Uncover(x, y)
 				// Redraw to the batch
-				io.drawToBatch(io.game.Appearance())
+				io.drawToBatch(io.game.Appearance(0, 0, w, h))
 			}
 			if io.window.JustPressed(pixelgl.MouseButtonRight) {
 				// Get the tile's position from the mouse
@@ -81,7 +81,7 @@ func (io *PixelIO) Run() {
 				// Uncover the tile
 				io.game.Flag(x, y)
 				// Redraw to the batch
-				io.drawToBatch(io.game.Appearance())
+				io.drawToBatch(io.game.Appearance(0, 0, w, h))
 			}
 
 			// Draw the mines
