@@ -153,7 +153,7 @@ export default class Game {
 
     public async draw() {
         const now = Date.now();
-        // Max of 30 draws per second
+        // Max of 60 draws per second
         if (now - this.lastDrawTimestamp > 1000 / 60) {
             this.lastDrawTimestamp = now;
             // Request the appearance of the board from Go
