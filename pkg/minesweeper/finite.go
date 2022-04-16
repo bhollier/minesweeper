@@ -96,7 +96,7 @@ func (g *FiniteGame) Uncover(x, y int) (s GameState) {
 	}
 
 	// Create a queue
-	queue := []pos{{x, y}}
+	queue := []Pos{{x, y}}
 
 	// While there are tiles to process
 	for len(queue) > 0 {
@@ -162,28 +162,29 @@ func (g *FiniteGame) SinceStart() time.Duration {
 	return time.Now().Sub(g.startTime)
 }
 
-func (g *FiniteGame) Appearance(x, y, w, h int) [][]TileType {
+func (g *FiniteGame) Appearance(x, y, w, h int) map[Pos]TileType {
 	// Make sure the rect is in range
 	x, y = max(x, 0), max(y, 0)
 	x, y = min(x, g.w-1), min(y, g.h-1)
 	w, h = min(w, g.w-x), min(h, g.h-y)
+	maxX, maxY := x+w, y+h
 
-	appearance := make([][]TileType, h)
-	for y := y; y < h; y++ {
-		appearance[y] = make([]TileType, w)
-		for x := x; x < w; x++ {
+	appearance := make(map[Pos]TileType, w*h)
+	for y := y; y < maxY; y++ {
+		for x := x; x < maxX; x++ {
+			pos := Pos{x, y}
 			// If the game hasn't started yet, or the tile is undiscovered
 			if g.state == GameStateStart || !g.field[y][x].Discovered {
 				// If the tile is flagged
 				if g.field[y][x].Flagged {
 					// Set the tile as flagged
-					appearance[y][x] = TileTypeFlag
+					appearance[pos] = TileTypeFlag
 				} else {
 					// Set the tile as hidden
-					appearance[y][x] = TileTypeHidden
+					appearance[pos] = TileTypeHidden
 				}
 			} else {
-				appearance[y][x] = g.field[y][x].Type
+				appearance[pos] = g.field[y][x].Type
 			}
 		}
 	}
@@ -222,7 +223,7 @@ func Load(r io.Reader) (*Game, error) {
 */
 
 type tileAndPos struct {
-	pos
+	Pos
 	Tile
 }
 
@@ -240,7 +241,7 @@ func (g *FiniteGame) neighbouringTiles(x, y int) []tileAndPos {
 				continue
 			}
 			// Add the tile
-			tiles = append(tiles, tileAndPos{pos{X: neighbourX, Y: neighbourY},
+			tiles = append(tiles, tileAndPos{Pos{X: neighbourX, Y: neighbourY},
 				g.field[neighbourY][neighbourX]})
 		}
 	}

@@ -1,8 +1,8 @@
 import Menu, {Element} from './menu';
-import {SPRITES, clear} from './draw';
+import {SPRITES, clear} from '../draw';
 
-import {limiter} from './util';
-import {pos} from './common';
+import {limiter} from '../util';
+import {pos} from '../common';
 
 const TITLE: Element = {
     id: 'menu.main.title',
@@ -43,8 +43,16 @@ export const CUSTOM_BUTTON: Element = {
     interactable: false
 };*/
 
+export const INFINITE_BUTTON: Element = {
+    id: 'menu.main.infinite_button',
+    sprite: SPRITES.MAIN_MENU.INFINITE,
+    hoveredSprite: pos(SPRITES.MAIN_MENU.INFINITE_HOVERED),
+    scale: 1.25,
+    interactable: true
+};
+
 // The elements, in order of how they're displayed on screen (top down)
-const ELEMENTS: Array<Element> = [TITLE, EASY_BUTTON, MEDIUM_BUTTON, HARD_BUTTON/*, CUSTOM_BUTTON*/];
+const ELEMENTS: Array<Element> = [TITLE, EASY_BUTTON, MEDIUM_BUTTON, HARD_BUTTON/*, CUSTOM_BUTTON*/, INFINITE_BUTTON];
 
 export default class MainMenu extends Menu {
     private readonly drawWithLimit: () => void;

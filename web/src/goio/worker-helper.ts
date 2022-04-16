@@ -1,4 +1,4 @@
-import * as Util from './util';
+import * as Util from '../util';
 
 // Create the WASM web worker
 Util.consoleLog('Creating WASM worker');

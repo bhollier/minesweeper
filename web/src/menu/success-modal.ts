@@ -1,8 +1,8 @@
 import Modal, {BACK_BUTTON} from './modal';
 import {Element} from './menu';
-import {SPRITES} from './draw';
+import {SPRITES} from '../draw';
 
-import {pos} from './common';
+import {pos} from '../common';
 
 export const TITLE: Element = {
     id: 'modal.success.title',

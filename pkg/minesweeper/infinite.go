@@ -41,7 +41,7 @@ func randomChunk(numMines int) *chunk {
 
 // randomChunkFromFirstMove creates a chunk with the given number of mines,
 // but doesn't put a mine at the given position
-func randomChunkFromFirstMove(numMines, startX, startY int) *chunk {
+func randomChunkFromFirstMove(numMines int, startPos Pos) *chunk {
 	c := new(chunk)
 
 	// Place the mines
@@ -53,9 +53,9 @@ func randomChunkFromFirstMove(numMines, startX, startY int) *chunk {
 			x := rand.Intn(ChunkSize)
 			// If the spot doesn't already have a mine and isn't near the
 			// start point
-			if c[y][x].mine &&
-				!(x >= startX-1 && x <= startX+1 &&
-					y >= startY-1 && y <= startY+1) {
+			if !c[y][x].mine &&
+				!(x >= startPos.X-1 && x <= startPos.X+1 &&
+					y >= startPos.Y-1 && y <= startPos.Y+1) {
 				// Set the tile as a mine
 				c[y][x].mine = true
 				// We placed a mine, break out of this loop
@@ -66,23 +66,39 @@ func randomChunkFromFirstMove(numMines, startX, startY int) *chunk {
 	return c
 }
 
+func mod(a, b int) int {
+	return (a%b + b) % b
+}
+
+func fieldPos(p Pos) Pos {
+	// move negative positions over a chunk. This is because -0 == 0,
+	// so a pos of -1 would be in the same chunk as a pos of 1
+	if p.X < 0 {
+		p.X -= ChunkSize
+	}
+	if p.Y < 0 {
+		p.Y -= ChunkSize
+	}
+	return Pos{p.X / ChunkSize, p.Y / ChunkSize}
+}
+
 // Converts the given x and y to the index of the chunk in the field,
 // and the position within that chunk
-func chunkPos(p pos) (chunkIndex pos, chunkPos pos) {
-	return pos{p.X / ChunkSize, p.Y / ChunkSize}, pos{p.X % ChunkSize, p.Y % ChunkSize}
+func chunkPos(p Pos) (chunkIndex Pos, chunkPos Pos) {
+	return fieldPos(p), Pos{mod(p.X, ChunkSize), mod(p.Y, ChunkSize)}
 }
 
 // InfiniteGame stores an infinite minesweeper game
 type InfiniteGame struct {
 	mineDensity int
-	field       map[pos]*chunk
+	field       map[Pos]*chunk
 	state       GameState
 	startTime   time.Time
 }
 
 func NewInfiniteGame(mineDensity int) (Game, error) {
 	g := &InfiniteGame{
-		field: make(map[pos]*chunk),
+		field: make(map[Pos]*chunk),
 	}
 
 	// Reset the game
@@ -123,7 +139,7 @@ func (g *InfiniteGame) Uncover(x, y int) (s GameState) {
 	}
 
 	{
-		chunkIndex, chunkPos := chunkPos(pos{x, y})
+		chunkIndex, chunkPos := chunkPos(Pos{x, y})
 
 		// Get the chunk
 		chunk, ok := g.field[chunkIndex]
@@ -131,7 +147,7 @@ func (g *InfiniteGame) Uncover(x, y int) (s GameState) {
 		if !ok {
 			// Use a random chunk for the first move,
 			// so the user doesn't click a mine accidentally
-			chunk = randomChunkFromFirstMove(g.mineDensity, x, y)
+			chunk = randomChunkFromFirstMove(g.mineDensity, chunkPos)
 			g.field[chunkIndex] = chunk
 		}
 
@@ -162,7 +178,7 @@ func (g *InfiniteGame) Uncover(x, y int) (s GameState) {
 	}
 
 	// Create a queue
-	queue := []pos{{x, y}}
+	queue := []Pos{{x, y}}
 
 	// While there are tiles to process
 	for len(queue) > 0 {
@@ -186,8 +202,7 @@ func (g *InfiniteGame) Uncover(x, y int) (s GameState) {
 			for _, neighbouringTile := range neighbouringTiles {
 				// Only uncover undiscovered tiles
 				if !neighbouringTile.discovered {
-					queue = append(queue, struct{ X, Y int }{
-						neighbouringTile.X, neighbouringTile.Y})
+					queue = append(queue, Pos{neighbouringTile.X, neighbouringTile.Y})
 				}
 			}
 		}
@@ -204,7 +219,7 @@ func (g *InfiniteGame) Flag(x, y int) {
 	}
 
 	// Get the tile
-	tile := g.get(pos{x, y})
+	tile := g.get(Pos{x, y})
 
 	// If the tile is already discovered, just return
 	if tile.discovered {
@@ -227,18 +242,20 @@ func (g *InfiniteGame) SinceStart() time.Duration {
 	return time.Now().Sub(g.startTime)
 }
 
-func (g *InfiniteGame) Appearance(x, y, w, h int) [][]TileType {
-	appearance := make([][]TileType, h)
-	for y := y; y < h; y++ {
-		appearance[y] = make([]TileType, w)
-		for x := x; x < w; x++ {
+func (g *InfiniteGame) Appearance(x, y, w, h int) (appearance map[Pos]TileType) {
+	maxX, maxY := x+w, y+h
+
+	appearance = make(map[Pos]TileType, w*h)
+	for y := y; y < maxY; y++ {
+		for x := x; x < maxX; x++ {
 			// Get the chunk
-			chunkIndex, chunkPos := chunkPos(pos{x, y})
+			pos := Pos{x, y}
+			chunkIndex, chunkPos := chunkPos(pos)
 			chunk, ok := g.field[chunkIndex]
 
 			// If the chunk doesn't exist, then the tile is hidden
 			if !ok {
-				appearance[y][x] = TileTypeHidden
+				appearance[pos] = TileTypeHidden
 			} else {
 				// Get the tile
 				tile := chunk[chunkPos.Y][chunkPos.X]
@@ -248,14 +265,14 @@ func (g *InfiniteGame) Appearance(x, y, w, h int) [][]TileType {
 					// If the tile is flagged
 					if tile.flagged {
 						// Set the tile as flagged
-						appearance[y][x] = TileTypeFlag
+						appearance[pos] = TileTypeFlag
 					} else {
 						// Set the tile as hidden
-						appearance[y][x] = TileTypeHidden
+						appearance[pos] = TileTypeHidden
 					}
 
 				} else if tile.mine {
-					appearance[y][x] = TileTypeMine
+					appearance[pos] = TileTypeMine
 
 				} else {
 					// todo this is pretty slow, could be cached
@@ -263,7 +280,7 @@ func (g *InfiniteGame) Appearance(x, y, w, h int) [][]TileType {
 					numNeighbouringMines := mineCount(neighbouringTiles)
 
 					// Set the appearance from the neighbouring mines
-					appearance[y][x] = TileType(int(TileTypeEmpty) +
+					appearance[pos] = TileType(int(TileTypeEmpty) +
 						numNeighbouringMines)
 				}
 			}
@@ -274,9 +291,8 @@ func (g *InfiniteGame) Appearance(x, y, w, h int) [][]TileType {
 
 // Retrieve the tile at the given position, and automatically populate the
 // chunk the tile is in if it doesn't exist yet
-func (g *InfiniteGame) get(p pos) *chunkTile {
-	chunkIndex := pos{p.X / ChunkSize, p.Y / ChunkSize}
-	chunkPos := pos{p.X % ChunkSize, p.Y % ChunkSize}
+func (g *InfiniteGame) get(p Pos) *chunkTile {
+	chunkIndex, chunkPos := chunkPos(p)
 
 	// Get the chunk
 	chunk, ok := g.field[chunkIndex]
@@ -290,7 +306,7 @@ func (g *InfiniteGame) get(p pos) *chunkTile {
 }
 
 type chunkTileAndPos struct {
-	pos
+	Pos
 	*chunkTile
 }
 
@@ -306,8 +322,8 @@ func (g *InfiniteGame) neighbouringTiles(x, y int) (tiles []chunkTileAndPos) {
 			}
 			// Add the tile
 			tiles = append(tiles, chunkTileAndPos{
-				pos:       pos{X: neighbourX, Y: neighbourY},
-				chunkTile: g.get(pos{neighbourX, neighbourY}),
+				Pos:       Pos{X: neighbourX, Y: neighbourY},
+				chunkTile: g.get(Pos{neighbourX, neighbourY}),
 			})
 		}
 	}

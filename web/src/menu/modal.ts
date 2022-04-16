@@ -1,7 +1,7 @@
 import Menu, {Element} from './menu';
-import {SPRITES, canvas, ctx, drawSprite} from './draw';
+import {SPRITES, canvas, ctx, drawSprite} from '../draw';
 
-import {Rect, pos} from './common';
+import {Rect, pos} from '../common';
 
 // THe background of the modal is made up of a grid of 12x12 tiles
 const MODAL_GRID_SIZE = 10;

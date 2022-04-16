@@ -1,15 +1,15 @@
 import Camera, {PressEvent, TILE_DRAW_SIZE} from './camera';
-import {SPRITES, canvas, ctx, drawSprite} from './draw';
+import {SPRITES, canvas, ctx, drawSprite} from '../draw';
 
-import Modal, {BACK_BUTTON, CLOSE_BUTTON} from './modal';
-import RetryModal, {RETRY_BUTTON} from './retry-modal';
-import SuccessModal, {RESET_BUTTON} from './success-modal';
-import {ElementPressEvent} from './menu';
+import * as goio from '../goio/goio';
 
-import {consoleLog, limiter} from './util';
-import {Size} from './common';
+import Modal, {BACK_BUTTON, CLOSE_BUTTON} from '../menu/modal';
+import RetryModal, {RETRY_BUTTON} from '../menu/retry-modal';
+import SuccessModal, {RESET_BUTTON} from '../menu/success-modal';
+import {ElementPressEvent} from '../menu/menu';
 
-import * as worker from './worker-helper';
+import {consoleLog, limiter} from '../util';
+import {Size} from '../common';
 
 // Constants for the game states
 const GAME_STATES = {
@@ -76,31 +76,49 @@ function preventDefault(e: Event) {
     e.preventDefault();
 }
 
+export type FiniteGameProps = Size & {
+    numMines: number
+}
+
+export type InfiniteGameProps = {
+    mineDensity: number
+}
+
+export type GameProps = (FiniteGameProps | InfiniteGameProps) & {
+    handleBack: () => void
+}
+
 export default class Game {
-    private readonly fieldSize: Size;
-    private readonly numMines: number;
-    private readonly handleBack: () => void;
+    private readonly props: GameProps;
 
     private readonly camera: Camera;
     private readonly modal: ModalContainer;
 
     // The draw function with a limiter, to prevent flickering when resizing
     private readonly drawWithLimit: () => void;
+    // The last time a draw was done, to prevent the draw method from spamming the backend
+    // todo this isn't a perfect solution, if you scroll fast enough
+    //  you can still see the tiles load in
+    private lastDrawTimestamp: number;
 
     private gameOver: boolean;
 
-    constructor(width, height, numMines: number, handleBack: () => void) {
-        this.fieldSize = {w: width, h: height};
-        this.numMines = numMines;
-        this.handleBack = handleBack;
+    constructor(props: GameProps) {
+        this.props = props;
 
-        this.camera = new Camera(this.fieldSize);
+        if ('w' in this.props && 'h' in this.props) {
+            this.camera = new Camera({w: this.props.w, h: this.props.h});
+        } else {
+            this.camera = new Camera();
+        }
+
         this.camera.addEventListener('press', this.handlePress.bind(this));
         this.camera.addEventListener('longpress', this.handleLongPress.bind(this));
         this.camera.addEventListener('move', this.draw.bind(this));
 
         this.modal = new ModalContainer();
         this.drawWithLimit = limiter(this.draw.bind(this), 100);
+        this.lastDrawTimestamp = 0;
 
         this.reset();
 
@@ -110,28 +128,42 @@ export default class Game {
     private reset() {
         this.camera.reset();
         this.gameOver = false;
-        worker.postMessage('init', {
-            'width': this.fieldSize.w,
-            'height': this.fieldSize.h,
-            'mines': this.numMines,
 
-            // Once initialised, draw it
-        }).then(this.draw.bind(this));
+        let initialisePromise;
+        // Finite type
+        if ('w' in this.props && 'h' in this.props && 'numMines' in this.props) {
+            initialisePromise = goio.init({
+                width: this.props.w,
+                height: this.props.h,
+                mines: this.props.numMines
+            });
+
+            // Infinite type
+        } else if ('mineDensity' in this.props) {
+            initialisePromise = goio.init({
+                mineDensity: this.props.mineDensity
+            });
+        } else {
+            throw new Error('unknown game props type');
+        }
+
+        // Once initialised, draw it
+        initialisePromise.then(this.draw.bind(this));
     }
 
     public async draw() {
-        // todo only request the visible mines (with the camera)
-        const rect = {
-            x: 0, y: 0,
-            w: this.fieldSize.w, h: this.fieldSize.h
-        };
+        const now = Date.now();
+        // Max of 30 draws per second
+        if (now - this.lastDrawTimestamp > 1000 / 60) {
+            this.lastDrawTimestamp = now;
+            // Request the appearance of the board from Go
+            await goio.appearance(this.camera.visibleTiles)
+                // Then draw it
+                .then(this.drawAppearance.bind(this))
+                // Then draw the modal over top (if active)
+                .then(this.modal.draw.bind(this.modal));
+        }
 
-        // Request the appearance of the board from Go
-        await worker.postMessage('appearance', rect)
-            // Then draw it
-            .then(this.drawAppearance.bind(this))
-            // Then draw the modal over top (if active)
-            .then(this.modal.draw.bind(this.modal));
     }
 
     public registerEvents() {
@@ -149,38 +181,42 @@ export default class Game {
         this.modal.deregisterEvents();
     }
 
-    private async drawAppearance(appearanceData: Array<Array<string>>) {
+    private async drawAppearance(appearanceData: goio.AppearanceResponseData) {
         // The canvas width and height
         const w = canvas.width, h = canvas.height;
 
         // Clear the canvas (for now)
         ctx.clearRect(0, 0, w, h);
 
-        const drawPromises = [] as Array<Promise<void>>;
-
+        const min = {x: Number.MAX_VALUE, y: Number.MAX_VALUE};
+        const max = {x: Number.MIN_VALUE, y: Number.MIN_VALUE};
         // Iterate over the tiles
-        for (let y = 0; y < this.fieldSize.h; ++y) {
-            for (let x = 0; x < this.fieldSize.w; ++x) {
+        for (const yKey in appearanceData) {
+            const y = Number(yKey);
+            min.y = Math.min(min.y, y);
+            max.y = Math.max(max.y, y);
+            for (const xKey in appearanceData[y]) {
+                const x = Number(xKey);
+                min.x = Math.min(min.x, x);
+                max.x = Math.max(max.x, x);
                 // Get the sprite
                 const sprite = SPRITES.TILES[appearanceData[y][x]];
                 // Calculate the position of the tile on the canvas
                 const pos = this.camera.toCanvasPos(x, y);
-                drawPromises.push(drawSprite(sprite, {
+                drawSprite(sprite, {
                     // The position of the tile to draw to
                     x: pos.x, y: pos.y,
                     // The size of the tile to draw to
                     w: TILE_DRAW_SIZE * this.camera.scale, h: TILE_DRAW_SIZE * this.camera.scale
-                }));
+                });
             }
         }
 
         // todo pagination
         // todo draw bar
-
-        return Promise.all(drawPromises);
     }
 
-    private handleState(stateData) {
+    private handleState(stateData: goio.UncoverResponseData) {
         switch (stateData.state) {
         case GAME_STATES.WIN:
             this.gameOver = true;
@@ -218,7 +254,7 @@ export default class Game {
                 break;
             case BACK_BUTTON.id:
                 this.deregisterEvents();
-                this.handleBack();
+                this.props.handleBack();
             }
         });
         // The modal is open so don't allow the camera to move
@@ -231,7 +267,7 @@ export default class Game {
         if (!this.gameOver) {
             // Left mouse button
             if (event.button === 0) {
-                worker.postMessage('uncover', event.pos)
+                goio.uncover(event.pos)
                     .then(async state => {
                         await this.draw();
                         this.handleState(state);
@@ -239,7 +275,7 @@ export default class Game {
 
                 // Right mouse button
             } else if (event.button === 2) {
-                worker.postMessage('flag', event.pos)
+                goio.flag(event.pos)
                     .then(this.draw.bind(this));
             }
 
@@ -254,8 +290,7 @@ export default class Game {
 
     private handleLongPress(event: PressEvent) {
         if (!this.gameOver && event.button === 0) {
-            worker.postMessage('flag', event.pos)
-                .then(this.draw.bind(this));
+            goio.flag(event.pos).then(this.draw.bind(this));
         }
     }
 }

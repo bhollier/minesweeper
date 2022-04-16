@@ -1,14 +1,24 @@
-import {Pos, Size} from './common';
-import EventManager from './event-manager';
-import {canvas} from './draw';
+import {Pos, Rect, Size} from '../common';
+import EventManager from '../event-manager';
+import {canvas} from '../draw';
+
+import * as Util from '../util';
+
+function consoleLog(s) {
+    Util.consoleLog('(camera) ' + s);
+}
+
+// todo limit presses (to prevent spam)
 
 // Constant for the draw size of a tile
 export const TILE_DRAW_SIZE = 30;
 
 // Constant for the minimum scale
-export const MIN_SCALE = 0.2;
+export const MIN_SCALE = 0.5;
 // Constant for the maximum scale
 export const MAX_SCALE = 4.0;
+
+export const MOUSE_WHEEL_SCALE = 0.0025;
 
 // Constant for how long a pointer needs to be pressed to be a "long press", in
 // milliseconds
@@ -32,7 +42,7 @@ interface CameraEventMap {
 }
 
 export default class Camera extends EventManager<CameraEventMap> {
-    private fieldSize: Size;
+    private fieldSize: Size | undefined;
 
     #translation: Pos;
     #scale: number;
@@ -41,16 +51,17 @@ export default class Camera extends EventManager<CameraEventMap> {
         touches: Array<PointerEvent>
         moveOrScale: boolean,
         distance: number | null,
-        timeout: ReturnType<typeof setTimeout>
-    } | null;
+        longPressTimeout: ReturnType<typeof setTimeout> | null
+    };
 
     private readonly handleWheel;
     private readonly handlePointerDown;
     private readonly handlePointerMove;
+    private readonly handlePointerCancel;
     private readonly handlePointerOut;
     private readonly handlePointerUp;
 
-    constructor(fieldSize: Size) {
+    constructor(fieldSize?: Size) {
         super();
 
         this.fieldSize = fieldSize;
@@ -58,11 +69,16 @@ export default class Camera extends EventManager<CameraEventMap> {
         // Reset the camera
         this.reset();
 
-        this.pointerDownEvent = null;
+        this.pointerDownEvent = {
+            touches: [],
+            moveOrScale: false,
+            distance: null,
+            longPressTimeout: null
+        };
 
         this.handleWheel = (event : WheelEvent) => {
             // Change the camera's scale
-            const newScale = this.#scale + (event.deltaY * -0.005);
+            const newScale = this.#scale + (event.deltaY * -MOUSE_WHEEL_SCALE);
             // Only change the scale if it's valid
             if (newScale > MIN_SCALE && newScale < MAX_SCALE) {
                 this.#scale = newScale;
@@ -80,30 +96,33 @@ export default class Camera extends EventManager<CameraEventMap> {
             event.preventDefault();
 
             // If this is the first pointer event
-            if (this.pointerDownEvent == null) {
-                // Create the pointerdown event info
-                this.pointerDownEvent = {
-                    touches: [],
-                    moveOrScale: false,
-                    distance: null,
-                    // Time out for long presses
-                    timeout: setTimeout(() => {
-                        // Make sure there was a pointer down event
-                        if (this.pointerDownEvent == null || this.pointerDownEvent.moveOrScale) {
-                            return;
-                        }
+            if (this.pointerDownEvent.touches.length == 0) {
+                consoleLog('first pointerdown');
+                // Set the timeout for long presses
+                this.pointerDownEvent.longPressTimeout = setTimeout(() => {
+                    // Make sure there was a pointer down event
+                    if (this.pointerDownEvent.touches.length === 0 ||
+                        this.pointerDownEvent.moveOrScale) {
+                        return;
+                    }
+                    consoleLog('longpress timeout');
 
-                        // Call the event listeners
-                        this.callEventListeners('longpress', {
-                            pos: this.toWorldPos(
-                                this.pointerDownEvent.touches[0].clientX,
-                                this.pointerDownEvent.touches[0].clientY),
-                            button: event.button
-                        });
+                    // Call the event listeners
+                    this.callEventListeners('longpress', {
+                        pos: this.toWorldPos(
+                            this.pointerDownEvent.touches[0].clientX,
+                            this.pointerDownEvent.touches[0].clientY),
+                        button: event.button
+                    });
 
-                        this.pointerDownEvent = null;
-                    }, LONG_PRESS_DELAY_MS)
-                };
+                    // Reset the touches
+                    this.pointerDownEvent.touches = [];
+                }, LONG_PRESS_DELAY_MS);
+                // Reset the other fields
+                this.pointerDownEvent.moveOrScale = false;
+                this.pointerDownEvent.distance = null;
+            } else {
+                consoleLog('another pointerdown');
             }
 
             // Add the pointer event
@@ -112,7 +131,7 @@ export default class Camera extends EventManager<CameraEventMap> {
 
         this.handlePointerMove = (event: PointerEvent) => {
             event.preventDefault();
-            if (this.pointerDownEvent == null) {
+            if (this.pointerDownEvent.touches.length === 0) {
                 return;
             }
 
@@ -134,14 +153,16 @@ export default class Camera extends EventManager<CameraEventMap> {
                 this.#translation.x += deltaX;
                 this.#translation.y += deltaY;
 
-                // Restrict the camera
-                const maxX = (this.fieldSize.w * TILE_DRAW_SIZE * this.#scale) / 2;
-                const maxY = (this.fieldSize.h * TILE_DRAW_SIZE * this.#scale) / 2;
+                // Restrict the camera if the field is fixed size
+                if (this.fieldSize !== undefined) {
+                    const maxX = (this.fieldSize.w * TILE_DRAW_SIZE * this.#scale) / 2;
+                    const maxY = (this.fieldSize.h * TILE_DRAW_SIZE * this.#scale) / 2;
 
-                this.#translation.x = Math.min(this.#translation.x, maxX);
-                this.#translation.x = Math.max(this.#translation.x, -maxX);
-                this.#translation.y = Math.min(this.#translation.y, maxY);
-                this.#translation.y = Math.max(this.#translation.y, -maxY);
+                    this.#translation.x = Math.min(this.#translation.x, maxX);
+                    this.#translation.x = Math.max(this.#translation.x, -maxX);
+                    this.#translation.y = Math.min(this.#translation.y, maxY);
+                    this.#translation.y = Math.max(this.#translation.y, -maxY);
+                }
 
                 // If there's multiple, this is a pinch event
             } else {
@@ -173,7 +194,11 @@ export default class Camera extends EventManager<CameraEventMap> {
 
             // Set the pointer as having moved (so the user doesn't flag something by
             // dragging)
-            this.pointerDownEvent.moveOrScale = true;
+            if (!this.pointerDownEvent.moveOrScale) {
+                consoleLog('pointer moved, not press event');
+                this.pointerDownEvent.moveOrScale = true;
+                clearTimeout(this.pointerDownEvent.longPressTimeout);
+            }
 
             // Update the event
             const touchIndex = this.pointerDownEvent.touches.findIndex(
@@ -187,47 +212,54 @@ export default class Camera extends EventManager<CameraEventMap> {
             });
         };
 
+        this.handlePointerCancel = (event: PointerEvent) => {
+            consoleLog('pointercancel');
+        };
+        
         this.handlePointerOut = (event: PointerEvent) => {
             event.preventDefault();
             // Make sure there was a pointer down event
-            if (this.pointerDownEvent == null) {
+            if (this.pointerDownEvent.touches.length == 0) {
                 return;
             }
 
             // If there are multiple pointers
             if (this.pointerDownEvent.touches.length > 1) {
+                consoleLog('pointerout: one of multiple');
                 // Remove the pointer's touch
                 this.pointerDownEvent.touches = this.pointerDownEvent.touches.filter(
                     e => e.pointerId !== event.pointerId);
                 // Remove the distance
                 this.pointerDownEvent.distance = null;
-
-                // Otherwise
             } else {
+                consoleLog('pointerout: no press event');
                 // Clear the event
-                clearTimeout(this.pointerDownEvent.timeout);
-                this.pointerDownEvent = null;
+                clearTimeout(this.pointerDownEvent.longPressTimeout);
+                this.pointerDownEvent.touches = [];
             }
         };
 
         this.handlePointerUp = (event: PointerEvent) => {
             event.preventDefault();
             // Make sure there was a pointer down event
-            if (this.pointerDownEvent == null) {
+            if (this.pointerDownEvent.touches.length === 0) {
                 return;
             }
 
             // If there are multiple pointers
             if (this.pointerDownEvent.touches.length > 1) {
+                consoleLog('pointerup: one of multiple');
                 // Remove the pointer's touch
                 this.pointerDownEvent.touches = this.pointerDownEvent.touches.filter(
                     e => e.pointerId !== event.pointerId);
                 // Remove the distance
                 this.pointerDownEvent.distance = null;
                 return;
+            }
 
-                // If the pointer didn't moveOrScale (and there's one pointer)
-            } else if (!this.pointerDownEvent.moveOrScale) {
+            // If the pointer didn't moveOrScale
+            if (!this.pointerDownEvent.moveOrScale) {
+                consoleLog('pointerup: no movement or scaling, press event');
                 // Call the event listeners
                 this.callEventListeners('press', {
                     pos: this.toWorldPos(
@@ -235,17 +267,26 @@ export default class Camera extends EventManager<CameraEventMap> {
                         this.pointerDownEvent.touches[0].clientY),
                     button: event.button
                 });
+            } else {
+                consoleLog('pointerup');
             }
 
             // Clear the event
-            clearTimeout(this.pointerDownEvent.timeout);
-            this.pointerDownEvent = null;
+            clearTimeout(this.pointerDownEvent.longPressTimeout);
+            this.pointerDownEvent.touches = [];
         };
 
         this.registerEvents();
     }
 
     private middleTranslation(): Pos {
+        // If there's no field size, the middle is just the middle of the canvas
+        if (this.fieldSize === undefined) {
+            return {
+                x: canvas.width / 2,
+                y: canvas.height / 2
+            };
+        }
         return {
             x: ((canvas.width / 2) -
                 (this.scale * ((this.fieldSize.w * TILE_DRAW_SIZE) / 2))),
@@ -262,14 +303,30 @@ export default class Camera extends EventManager<CameraEventMap> {
         return this.#scale;
     }
 
+    public get visibleTiles(): Rect {
+        const canvasRect = canvas.getBoundingClientRect();
+
+        const tileSize = TILE_DRAW_SIZE * this.scale;
+
+        const min = this.toWorldPos(canvasRect.left - tileSize, canvasRect.top - tileSize);
+        const max = this.toWorldPos(canvasRect.right + tileSize, canvasRect.bottom + tileSize);
+        return {
+            x: min.x,
+            y: min.y,
+            w: max.x - min.x,
+            h: max.y - min.y,
+        };
+    }
+
     public toCanvasPos(x, y: number): Pos {
         const middleTranslate = this.middleTranslation();
+        const rect = canvas.getBoundingClientRect();
         return {
-            x: middleTranslate.x +
-                (this.translation.x + ((x * TILE_DRAW_SIZE) * this.scale)),
+            x: middleTranslate.x + rect.left + this.translation.x +
+                ((x * TILE_DRAW_SIZE) * this.scale),
             // Translate to the center of the canvas
-            y: middleTranslate.y +
-                (this.translation.y + ((y * TILE_DRAW_SIZE) * this.scale)),
+            y: middleTranslate.y + rect.top + this.translation.y +
+                ((y * TILE_DRAW_SIZE) * this.scale),
         };
     }
 
@@ -279,20 +336,27 @@ export default class Camera extends EventManager<CameraEventMap> {
         return {
             x: Math.floor(((x - rect.left - middleTranslate.x -
                 this.translation.x) / this.scale) / TILE_DRAW_SIZE),
-            y: Math.floor(((y - rect.left - middleTranslate.y -
+            y: Math.floor(((y - rect.top - middleTranslate.y -
                 this.translation.y) / this.scale) / TILE_DRAW_SIZE),
         };
     }
 
     // Reset the camera to the middle of the field
     public reset() {
-        // Fit the game in the canvas
-        this.#scale = Math.min(
-            canvas.width / (this.fieldSize.w * TILE_DRAW_SIZE * 1.1),
-            canvas.height / (this.fieldSize.h * TILE_DRAW_SIZE * 1.1));
-        // Restrict the scale
-        this.#scale = Math.max(this.#scale, MIN_SCALE);
-        this.#scale = Math.min(this.#scale, MAX_SCALE);
+        // If the field size is set
+        if (this.fieldSize !== undefined) {
+            // Fit the game in the canvas
+            this.#scale = Math.min(
+                canvas.width / (this.fieldSize.w * TILE_DRAW_SIZE * 1.1),
+                canvas.height / (this.fieldSize.h * TILE_DRAW_SIZE * 1.1));
+            // Restrict the scale
+            this.#scale = Math.max(this.#scale, MIN_SCALE);
+            this.#scale = Math.min(this.#scale, MAX_SCALE);
+
+            // Otherwise set the scale to just 1
+        } else {
+            this.#scale = 1.0;
+        }
 
         // Reset the translation
         this.#translation = {x: 0, y: 0};
@@ -302,6 +366,7 @@ export default class Camera extends EventManager<CameraEventMap> {
         canvas.addEventListener('wheel', this.handleWheel);
         canvas.addEventListener('pointerdown', this.handlePointerDown);
         canvas.addEventListener('pointermove', this.handlePointerMove);
+        canvas.addEventListener('pointercancel', this.handlePointerCancel);
         canvas.addEventListener('pointerout', this.handlePointerOut);
         canvas.addEventListener('pointerup', this.handlePointerUp);
     }
@@ -310,6 +375,7 @@ export default class Camera extends EventManager<CameraEventMap> {
         canvas.removeEventListener('wheel', this.handleWheel);
         canvas.removeEventListener('pointerdown', this.handlePointerDown);
         canvas.removeEventListener('pointermove', this.handlePointerMove);
+        canvas.removeEventListener('pointercancel', this.handlePointerCancel);
         canvas.removeEventListener('pointerout', this.handlePointerOut);
         canvas.removeEventListener('pointerup', this.handlePointerUp);
     }

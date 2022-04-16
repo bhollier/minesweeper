@@ -1,8 +1,8 @@
-import {canvas, drawSprite} from './draw';
-import EventManager from './event-manager';
+import {canvas, drawSprite} from '../draw';
+import EventManager from '../event-manager';
 
-import {Pos, Rect} from './common';
-import {cloneObj} from './util';
+import {Pos, Rect} from '../common';
+import {cloneObj} from '../util';
 
 export type Hitbox = Rect
 

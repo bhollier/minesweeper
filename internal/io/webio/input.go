@@ -98,29 +98,39 @@ func (io *WebIO) handleInit(msg Message) {
 	sendSuccess(msg)
 }
 
-func appearancePayload(appearance [][]ms.TileType) []interface{} {
-	// Convert the appearance array into something js can understand
-	payload := make([]interface{}, len(appearance))
-	for y, row := range appearance {
-		responseRow := make([]interface{}, len(row))
-		for x, tile := range row {
-			var tileStr string
-			switch tile {
-			case ms.TileTypeEmpty:
-				tileStr = "EMPTY"
-			case ms.TileTypeFlag:
-				tileStr = "FLAG"
-			case ms.TileTypeHidden:
-				tileStr = "HIDDEN"
-			case ms.TileTypeMine:
-				tileStr = "MINE"
-			case ms.TileType1, ms.TileType2, ms.TileType3, ms.TileType4,
-				ms.TileType5, ms.TileType6, ms.TileType7, ms.TileType8:
-				tileStr = strconv.Itoa(int(tile) - int(ms.TileType1) + 1)
-			}
-			responseRow[x] = tileStr
+func appearancePayload(appearance map[ms.Pos]ms.TileType) interface{} {
+	arrConstructor := js.Global().Get("Array")
+
+	// Create a JS array
+	payload := arrConstructor.New()
+
+	// Iterate over the tiles
+	for pos, tileType := range appearance {
+		var tileStr string
+		switch tileType {
+		case ms.TileTypeEmpty:
+			tileStr = "EMPTY"
+		case ms.TileTypeFlag:
+			tileStr = "FLAG"
+		case ms.TileTypeHidden:
+			tileStr = "HIDDEN"
+		case ms.TileTypeMine:
+			tileStr = "MINE"
+		case ms.TileType1, ms.TileType2, ms.TileType3, ms.TileType4,
+			ms.TileType5, ms.TileType6, ms.TileType7, ms.TileType8:
+			tileStr = strconv.Itoa(int(tileType) - int(ms.TileType1) + 1)
 		}
-		payload[y] = responseRow
+
+		// Get the row from the payload
+		row := payload.Index(pos.Y)
+		// If it hasn't been set, create a new row
+		if row.IsUndefined() {
+			row = arrConstructor.New()
+		}
+
+		// Add the tile string to the row
+		row.SetIndex(pos.X, tileStr)
+		payload.SetIndex(pos.Y, row)
 	}
 	return payload
 }

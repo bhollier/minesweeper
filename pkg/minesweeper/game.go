@@ -2,7 +2,7 @@ package minesweeper
 
 import "time"
 
-type pos struct {
+type Pos struct {
 	X, Y int
 }
 
@@ -76,6 +76,6 @@ type Game interface {
 	SinceStart() time.Duration
 
 	// Appearance returns the game's current appearance (where undiscovered tiles are
-	// TileTypeHidden)
-	Appearance(x, y, w, h int) [][]TileType
+	// TileTypeHidden). This is a map of Pos, as Go slices can't be sparse
+	Appearance(x, y, w, h int) map[Pos]TileType
 }

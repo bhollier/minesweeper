@@ -1,8 +1,8 @@
-import MainMenu, {EASY_BUTTON, HARD_BUTTON, MEDIUM_BUTTON} from './main-menu';
-import Game from './game';
+import Game, {FiniteGameProps, InfiniteGameProps} from './game/game';
+import MainMenu, {EASY_BUTTON, HARD_BUTTON, INFINITE_BUTTON, MEDIUM_BUTTON} from './menu/main-menu';
 
-import {canvas, ctx} from './draw';
-import {ElementPressEvent} from './menu';
+import {canvas, ctx, spritesheetLoaded} from './draw';
+import {ElementPressEvent} from './menu/menu';
 
 import '../assets/styles.css';
 
@@ -34,30 +34,46 @@ const mainMenu = new MainMenu();
 mainMenu.addEventListener('press', (event : ElementPressEvent) => {
     mainMenu.deregisterEvents();
 
-    // Determine the width, height and number of mines
-    let width, height, numMines;
+    // Determine the game properties
+    let gameProps: FiniteGameProps | InfiniteGameProps | undefined;
     switch (event.pressedElement) {
     case EASY_BUTTON.id:
-        width = 9;
-        height = 9;
-        numMines = 10;
+        gameProps = {
+            w: 9,
+            h: 9,
+            numMines: 10
+        };
         break;
     case MEDIUM_BUTTON.id:
-        width = 16;
-        height = 16;
-        numMines = 40;
+        gameProps = {
+            w: 16,
+            h: 16,
+            numMines: 40
+        };
         break;
     case HARD_BUTTON.id:
-        width = 30;
-        height = 16;
-        numMines = 99;
+        gameProps = {
+            w: 30,
+            h: 16,
+            numMines: 99
+        };
         break;
+    case INFINITE_BUTTON.id:
+        gameProps = {
+            // Medium difficulty mine density
+            mineDensity: 40,
+        };
     }
 
     // Create the game
-    new Game(width, height, numMines, () => {
-        mainMenu.registerEvents();
-        mainMenu.draw();
+    new Game({
+        ...gameProps,
+        handleBack: () => {
+            mainMenu.registerEvents();
+            mainMenu.draw();
+        }
     });
 });
-mainMenu.draw();
+
+// Draw the main menu once the spritesheet has loaded
+spritesheetLoaded.then(mainMenu.draw.bind(mainMenu));

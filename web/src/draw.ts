@@ -25,8 +25,8 @@ export const SPRITES = {
     },
 
     MODAL: {
-        BACK: {x: 0, y: 80, w: 24, h: ROW_HEIGHT} as Rect,
-        BACK_HOVERED: {x: 24, y: 80, w: 24, h: ROW_HEIGHT} as Rect
+        BACK: {x: 0, y: 90, w: 24, h: ROW_HEIGHT} as Rect,
+        BACK_HOVERED: {x: 24, y: 90, w: 24, h: ROW_HEIGHT} as Rect
     },
 
     MAIN_MENU: {
@@ -38,19 +38,21 @@ export const SPRITES = {
         HARD: {x: 0, y: 40, w: 25, h: ROW_HEIGHT} as Rect,
         HARD_HOVERED: {x: 25, y: 40, w: 26, h: ROW_HEIGHT} as Rect,
         CUSTOM: {x: 0, y: 50, w: 38, h: ROW_HEIGHT} as Rect,
-        CUSTOM_HOVERED: {x: 38, y: 50, w: 26, h: ROW_HEIGHT} as Rect
+        CUSTOM_HOVERED: {x: 38, y: 50, w: 26, h: ROW_HEIGHT} as Rect,
+        INFINITE: {x: 0, y: 60, w: 43, h: ROW_HEIGHT} as Rect,
+        INFINITE_HOVERED: {x: 43, y: 60, w: 43, h: ROW_HEIGHT} as Rect
     },
 
     RETRY_MODAL: {
-        TITLE: {x: 0, y: 60, w: 45, h: ROW_HEIGHT} as Rect,
-        RETRY: {x: 0, y: 70, w: 30, h: ROW_HEIGHT} as Rect,
-        RETRY_HOVERED: {x: 30, y: 70, w: 30, h: ROW_HEIGHT} as Rect,
+        TITLE: {x: 0, y: 70, w: 45, h: ROW_HEIGHT} as Rect,
+        RETRY: {x: 0, y: 80, w: 30, h: ROW_HEIGHT} as Rect,
+        RETRY_HOVERED: {x: 30, y: 80, w: 30, h: ROW_HEIGHT} as Rect,
     },
 
     SUCCESS_MODAL: {
-        TITLE: {x: 0, y: 90, w: 52, h: ROW_HEIGHT} as Rect,
-        RESET: {x: 0, y: 100, w: 53, h: ROW_HEIGHT} as Rect,
-        RESET_HOVERED: {x: 53, y: 100, w: 53, h: ROW_HEIGHT} as Rect,
+        TITLE: {x: 0, y: 100, w: 52, h: ROW_HEIGHT} as Rect,
+        RESET: {x: 0, y: 110, w: 53, h: ROW_HEIGHT} as Rect,
+        RESET_HOVERED: {x: 53, y: 110, w: 53, h: ROW_HEIGHT} as Rect,
     }
 };
 
@@ -62,7 +64,7 @@ export const ctx = canvas.getContext('2d');
 
 const spritesheet = new Image();
 
-const spritesheetLoaded = new Promise<void>(resolve => {
+export const spritesheetLoaded = new Promise<void>(resolve => {
     spritesheet.addEventListener('load', () => {
         consoleLog('Finished loading spritesheet');
         resolve();
@@ -83,10 +85,8 @@ export async function clear(rect?: Rect) {
     ctx.clearRect(rect.x, rect.y, rect.w, rect.h);
 }
 
-export async function drawSprite(sprite: Rect, drawRect: Rect) {
-    await spritesheetLoaded.then(() => {
-        ctx.drawImage(spritesheet,
-            sprite.x, sprite.y, sprite.w, sprite.h,
-            drawRect.x, drawRect.y, drawRect.w, drawRect.h);
-    });
+export function drawSprite(sprite: Rect, drawRect: Rect) {
+    ctx.drawImage(spritesheet,
+        sprite.x, sprite.y, sprite.w, sprite.h,
+        drawRect.x, drawRect.y, drawRect.w, drawRect.h);
 }
