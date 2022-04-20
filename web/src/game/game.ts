@@ -1,5 +1,5 @@
-import Camera, {PressEvent, TILE_DRAW_SIZE} from './camera';
-import {SPRITES, canvas, ctx, drawSprite} from '../draw';
+import Camera, {PressEvent} from './camera';
+import {canvas} from '../draw';
 
 import * as goio from '../goio/goio';
 
@@ -98,7 +98,9 @@ export default class Game {
     private readonly drawWithLimit: () => void;
     // The last time a draw was done, to prevent the draw method from spamming the backend
     // todo this isn't a perfect solution, if you scroll fast enough
-    //  you can still see the tiles load in
+    //  you can still see the tiles load in. A better solution might be to
+    //  load a lot more than necessary, cache it, and then load more once the
+    //  camera is near(ish) to the edge
     private lastDrawTimestamp: number;
 
     private gameOver: boolean;
@@ -159,11 +161,10 @@ export default class Game {
             // Request the appearance of the board from Go
             await goio.appearance(this.camera.visibleTiles)
                 // Then draw it
-                .then(this.drawAppearance.bind(this))
+                .then(this.camera.draw.bind(this.camera))
                 // Then draw the modal over top (if active)
                 .then(this.modal.draw.bind(this.modal));
         }
-
     }
 
     public registerEvents() {
@@ -179,41 +180,6 @@ export default class Game {
         canvas.removeEventListener('contextmenu', preventDefault);
         this.camera.deregisterEvents();
         this.modal.deregisterEvents();
-    }
-
-    private async drawAppearance(appearanceData: goio.AppearanceResponseData) {
-        // The canvas width and height
-        const w = canvas.width, h = canvas.height;
-
-        // Clear the canvas (for now)
-        ctx.clearRect(0, 0, w, h);
-
-        const min = {x: Number.MAX_VALUE, y: Number.MAX_VALUE};
-        const max = {x: Number.MIN_VALUE, y: Number.MIN_VALUE};
-        // Iterate over the tiles
-        for (const yKey in appearanceData) {
-            const y = Number(yKey);
-            min.y = Math.min(min.y, y);
-            max.y = Math.max(max.y, y);
-            for (const xKey in appearanceData[y]) {
-                const x = Number(xKey);
-                min.x = Math.min(min.x, x);
-                max.x = Math.max(max.x, x);
-                // Get the sprite
-                const sprite = SPRITES.TILES[appearanceData[y][x]];
-                // Calculate the position of the tile on the canvas
-                const pos = this.camera.toCanvasPos(x, y);
-                drawSprite(sprite, {
-                    // The position of the tile to draw to
-                    x: pos.x, y: pos.y,
-                    // The size of the tile to draw to
-                    w: TILE_DRAW_SIZE * this.camera.scale, h: TILE_DRAW_SIZE * this.camera.scale
-                });
-            }
-        }
-
-        // todo pagination
-        // todo draw bar
     }
 
     private handleState(stateData: goio.UncoverResponseData) {

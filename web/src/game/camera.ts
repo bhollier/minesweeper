@@ -1,33 +1,34 @@
-import {Pos, Rect, Size} from '../common';
+import {SPRITES, canvas, ctx, drawSprite} from '../draw';
+
 import EventManager from '../event-manager';
-import {canvas} from '../draw';
 
 import * as Util from '../util';
+import {Pos, Rect, Size} from '../common';
 
 function consoleLog(s) {
     Util.consoleLog('(camera) ' + s);
 }
 
 // todo limit presses (to prevent spam)
+// todo translate/scale on window resize
+// todo handle canvas that isn't fullscreen properly (though this isn't particularly useful)
 
 // Constant for the draw size of a tile
-export const TILE_DRAW_SIZE = 30;
+const TILE_DRAW_SIZE = 30;
 
 // Constant for the minimum scale
-export const MIN_SCALE = 0.5;
+const MIN_SCALE = 0.5;
 // Constant for the maximum scale
-export const MAX_SCALE = 4.0;
+const MAX_SCALE = 4.0;
 
-export const MOUSE_WHEEL_SCALE = 0.0025;
+const MOUSE_WHEEL_SCALE_FACTOR = 0.8;
 
 // Constant for how long a pointer needs to be pressed to be a "long press", in
 // milliseconds
 export const LONG_PRESS_DELAY_MS = 200;
 
-export type MoveEvent = {
-    translation: Pos
-    scale: number
-}
+// todo pass useful information here, e.g. delta scale/translation
+export type MoveEvent = Record<string, never>
 
 export type PressEvent = {
     pos: Pos
@@ -42,10 +43,10 @@ interface CameraEventMap {
 }
 
 export default class Camera extends EventManager<CameraEventMap> {
-    private fieldSize: Size | undefined;
+    private readonly fieldSize: Size | undefined;
 
-    #translation: Pos;
-    #scale: number;
+    private translation: Pos;
+    private scale: number;
 
     private pointerDownEvent : {
         touches: Array<PointerEvent>
@@ -77,19 +78,11 @@ export default class Camera extends EventManager<CameraEventMap> {
         };
 
         this.handleWheel = (event : WheelEvent) => {
-            // Change the camera's scale
-            const newScale = this.#scale + (event.deltaY * -MOUSE_WHEEL_SCALE);
-            // Only change the scale if it's valid
-            if (newScale > MIN_SCALE && newScale < MAX_SCALE) {
-                this.#scale = newScale;
+            // Calculate the scale factor
+            const factor = event.deltaY > 0 ? MOUSE_WHEEL_SCALE_FACTOR : 1 / MOUSE_WHEEL_SCALE_FACTOR;
 
-                // Call the event listeners
-                this.callEventListeners('move', {
-                    translation: this.#translation,
-                    scale: this.#scale
-                });
-            }
-            // todo zoom at mouse position
+            // Zoom the camera
+            this.zoom(factor, event.clientX, event.clientY);
         };
 
         this.handlePointerDown = (event: PointerEvent) => {
@@ -135,33 +128,54 @@ export default class Camera extends EventManager<CameraEventMap> {
                 return;
             }
 
+            // Get the index of the previous touch event
+            const previousTouchIndex = this.pointerDownEvent.touches.findIndex(
+                e => e.pointerId === event.pointerId);
+            // Save the previous touch
+            const previousTouch = this.pointerDownEvent.touches[previousTouchIndex];
+            // Update the touch event
+            this.pointerDownEvent.touches[previousTouchIndex] = event;
+
             // If there's only one touch event
             if (this.pointerDownEvent.touches.length === 1) {
                 // Calculate the amount the pointer moved
-                const deltaX = event.clientX -
-                    this.pointerDownEvent.touches[0].clientX;
-                const deltaY = event.clientY -
-                    this.pointerDownEvent.touches[0].clientY;
+                const delta = {
+                    x: event.clientX - previousTouch.clientX,
+                    y: event.clientY - previousTouch.clientY
+                };
                 // Don't register as a moveOrScale event if the pointer only moved half a tile (no
                 // scaling)
                 if (!this.pointerDownEvent.moveOrScale &&
-                    Math.abs(deltaX) < TILE_DRAW_SIZE / 4 &&
-                    Math.abs(deltaY) < TILE_DRAW_SIZE / 4) {
+                    Math.abs(delta.x) < TILE_DRAW_SIZE / 4 &&
+                    Math.abs(delta.y) < TILE_DRAW_SIZE / 4) {
                     return;
                 }
                 // Translate the camera
-                this.#translation.x += deltaX;
-                this.#translation.y += deltaY;
+                this.translation.x += delta.x;
+                this.translation.y += delta.y;
 
                 // Restrict the camera if the field is fixed size
                 if (this.fieldSize !== undefined) {
-                    const maxX = (this.fieldSize.w * TILE_DRAW_SIZE * this.#scale) / 2;
-                    const maxY = (this.fieldSize.h * TILE_DRAW_SIZE * this.#scale) / 2;
+                    const fieldRealSize = {
+                        x: this.fieldSize.w * TILE_DRAW_SIZE * this.scale,
+                        y: this.fieldSize.h * TILE_DRAW_SIZE * this.scale,
+                    };
 
-                    this.#translation.x = Math.min(this.#translation.x, maxX);
-                    this.#translation.x = Math.max(this.#translation.x, -maxX);
-                    this.#translation.y = Math.min(this.#translation.y, maxY);
-                    this.#translation.y = Math.max(this.#translation.y, -maxY);
+                    // At least half the field must be visible
+                    const min = {
+                        x: 0 - (fieldRealSize.x / 2),
+                        y: 0 - (fieldRealSize.y / 2)
+                    };
+                    const max = {
+                        x: canvas.width - (fieldRealSize.x / 2),
+                        y: canvas.height - (fieldRealSize.y / 2)
+                    };
+
+                    // Limit the translation
+                    this.translation.x = Math.min(this.translation.x, max.x);
+                    this.translation.x = Math.max(this.translation.x, min.x);
+                    this.translation.y = Math.min(this.translation.y, max.y);
+                    this.translation.y = Math.max(this.translation.y, min.y);
                 }
 
                 // If there's multiple, this is a pinch event
@@ -178,14 +192,17 @@ export default class Camera extends EventManager<CameraEventMap> {
 
                 // If a previous distance has been calculated
                 if (this.pointerDownEvent.distance != null) {
-                    // Calculate the new scale
-                    this.#scale += ((distance - this.pointerDownEvent.distance) * 0.005);
+                    // Calculate the scale factor
+                    const factor = distance / this.pointerDownEvent.distance;
 
-                    // Restrict the scale
-                    this.#scale = Math.max(this.#scale, MIN_SCALE);
-                    this.#scale = Math.min(this.#scale, MAX_SCALE);
+                    // Calculate the center of the zoom
+                    const center = {
+                        x: (touch0.clientX + touch1.clientX) / 2,
+                        y: (touch0.clientY + touch1.clientY) / 2
+                    };
 
-                    // todo zoom at touch position
+                    // Zoom the camera around the center
+                    this.zoom(factor, center.x, center.y);
                 }
 
                 // Set the distance
@@ -200,19 +217,12 @@ export default class Camera extends EventManager<CameraEventMap> {
                 clearTimeout(this.pointerDownEvent.longPressTimeout);
             }
 
-            // Update the event
-            const touchIndex = this.pointerDownEvent.touches.findIndex(
-                e => e.pointerId === event.pointerId);
-            this.pointerDownEvent.touches[touchIndex] = event;
-
             // Call the event listeners
-            this.callEventListeners('move', {
-                translation: this.#translation,
-                scale: this.#scale
-            });
+            this.callEventListeners('move', {});
         };
 
         this.handlePointerCancel = (event: PointerEvent) => {
+            // todo
             consoleLog('pointercancel');
         };
         
@@ -279,28 +289,76 @@ export default class Camera extends EventManager<CameraEventMap> {
         this.registerEvents();
     }
 
+    // Returns the translation so the game field is in the middle of the canvas
     private middleTranslation(): Pos {
-        // If there's no field size, the middle is just the middle of the canvas
+        // If there's no field size, the middle is just 0, 0
         if (this.fieldSize === undefined) {
-            return {
-                x: canvas.width / 2,
-                y: canvas.height / 2
-            };
+            return {x: 0, y: 0};
         }
         return {
-            x: ((canvas.width / 2) -
-                (this.scale * ((this.fieldSize.w * TILE_DRAW_SIZE) / 2))),
-            y: ((canvas.height / 2) -
-                (this.scale * ((this.fieldSize.h * TILE_DRAW_SIZE) / 2)))
+            x: (canvas.width / 2) - (this.scale * ((this.fieldSize.w * TILE_DRAW_SIZE) / 2)),
+            y: (canvas.height / 2) - (this.scale * ((this.fieldSize.h * TILE_DRAW_SIZE) / 2))
         };
     }
 
-    public get translation() {
-        return this.#translation;
+    public toCanvasPos(x, y: number): Pos {
+        return {
+            x: this.translation.x + (x * TILE_DRAW_SIZE * this.scale),
+            y: this.translation.y + (y * TILE_DRAW_SIZE * this.scale),
+        };
     }
 
-    public get scale() {
-        return this.#scale;
+    public toWorldPos(x, y: number): Pos {
+        return {
+            x: Math.floor(((x - this.translation.x) / this.scale) / TILE_DRAW_SIZE),
+            y: Math.floor(((y - this.translation.y) / this.scale) / TILE_DRAW_SIZE),
+        };
+    }
+
+    // Zooms the camera by the given factor around the given point
+    private zoom(factor: number, x, y: number): void {
+        // Calculate the camera's new scale
+        const newScale = this.scale * factor;
+
+        // Only change the scale if it's valid
+        if (newScale > MIN_SCALE && newScale < MAX_SCALE) {
+            // Translate the field so the mouse is still over the same tile
+            this.translation.x -= (x - this.translation.x) * (factor - 1);
+            this.translation.y -= (y - this.translation.y) * (factor - 1);
+
+            // Set the new scale
+            this.scale = newScale;
+
+            // Call the event listeners
+            this.callEventListeners('move', {});
+        }
+    }
+
+    public draw(tileData: Array<Array<string>>) {
+        // The canvas width and height
+        const w = canvas.width, h = canvas.height;
+
+        // Clear the canvas (for now)
+        ctx.clearRect(0, 0, w, h);
+
+        // Iterate over the tiles
+        for (const yKey in tileData) {
+            // We have to use the 'in' syntax, as tileData might not be 0...tileData.length
+            const y = Number(yKey);
+            for (const xKey in tileData[y]) {
+                const x = Number(xKey);
+                // Get the sprite
+                const sprite = SPRITES.TILES[tileData[y][x]];
+                // Calculate the position of the tile on the canvas
+                const pos = this.toCanvasPos(x, y);
+                drawSprite(sprite, {
+                    // The position of the tile to draw to
+                    x: pos.x, y: pos.y,
+                    // The size of the tile to draw to
+                    w: TILE_DRAW_SIZE * this.scale, h: TILE_DRAW_SIZE * this.scale
+                });
+            }
+        }
     }
 
     public get visibleTiles(): Rect {
@@ -318,48 +376,25 @@ export default class Camera extends EventManager<CameraEventMap> {
         };
     }
 
-    public toCanvasPos(x, y: number): Pos {
-        const middleTranslate = this.middleTranslation();
-        const rect = canvas.getBoundingClientRect();
-        return {
-            x: middleTranslate.x + rect.left + this.translation.x +
-                ((x * TILE_DRAW_SIZE) * this.scale),
-            // Translate to the center of the canvas
-            y: middleTranslate.y + rect.top + this.translation.y +
-                ((y * TILE_DRAW_SIZE) * this.scale),
-        };
-    }
-
-    public toWorldPos(x, y: number): Pos {
-        const middleTranslate = this.middleTranslation();
-        const rect = canvas.getBoundingClientRect();
-        return {
-            x: Math.floor(((x - rect.left - middleTranslate.x -
-                this.translation.x) / this.scale) / TILE_DRAW_SIZE),
-            y: Math.floor(((y - rect.top - middleTranslate.y -
-                this.translation.y) / this.scale) / TILE_DRAW_SIZE),
-        };
-    }
-
     // Reset the camera to the middle of the field
     public reset() {
         // If the field size is set
         if (this.fieldSize !== undefined) {
             // Fit the game in the canvas
-            this.#scale = Math.min(
+            this.scale = Math.min(
                 canvas.width / (this.fieldSize.w * TILE_DRAW_SIZE * 1.1),
                 canvas.height / (this.fieldSize.h * TILE_DRAW_SIZE * 1.1));
             // Restrict the scale
-            this.#scale = Math.max(this.#scale, MIN_SCALE);
-            this.#scale = Math.min(this.#scale, MAX_SCALE);
+            this.scale = Math.max(this.scale, MIN_SCALE);
+            this.scale = Math.min(this.scale, MAX_SCALE);
 
             // Otherwise set the scale to just 1
         } else {
-            this.#scale = 1.0;
+            this.scale = 1.0;
         }
 
-        // Reset the translation
-        this.#translation = {x: 0, y: 0};
+        // Translate to the middle
+        this.translation = this.middleTranslation();
     }
 
     public registerEvents() {
