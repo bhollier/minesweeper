@@ -15,10 +15,14 @@ function consoleLog(s) {
 // Constant for the draw size of a tile
 const TILE_DRAW_SIZE = 30;
 
+// todo might be better if scaling were based on canvas size
 // Constant for the minimum scale
-const MIN_SCALE = 0.5;
+const MIN_SCALE = 1.0;
 // Constant for the maximum scale
 const MAX_SCALE = 4.0;
+
+// Constant for the default scale (e.g. for infinite mode)
+const DEFAULT_SCALE = 2.0;
 
 const MOUSE_WHEEL_SCALE_FACTOR = 0.8;
 
@@ -347,7 +351,7 @@ export default class Camera extends EventManager<CameraEventMap> {
         }
     }
 
-    public draw(tileData: Array<Array<string>>) {
+    public async draw(tileData: Array<Array<string>>) {
         // The canvas width and height
         const w = canvas.width, h = canvas.height;
 
@@ -401,9 +405,9 @@ export default class Camera extends EventManager<CameraEventMap> {
             this.scale = Math.max(this.scale, MIN_SCALE);
             this.scale = Math.min(this.scale, MAX_SCALE);
 
-            // Otherwise set the scale to just 1
+            // Otherwise set the scale to the default
         } else {
-            this.scale = 1.0;
+            this.scale = DEFAULT_SCALE;
         }
 
         // Translate to the middle

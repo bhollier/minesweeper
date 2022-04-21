@@ -8,8 +8,8 @@ import RetryModal, {RETRY_BUTTON} from '../menu/retry-modal';
 import SuccessModal, {RESET_BUTTON} from '../menu/success-modal';
 import {ElementPressEvent} from '../menu/menu';
 
+import {Rect, Size} from '../common';
 import {consoleLog, limiter} from '../util';
-import {Size} from '../common';
 
 // Constants for the game states
 const GAME_STATES = {
@@ -96,12 +96,11 @@ export default class Game {
 
     // The draw function with a limiter, to prevent flickering when resizing
     private readonly drawWithLimit: () => void;
-    // The last time a draw was done, to prevent the draw method from spamming the backend
-    // todo this isn't a perfect solution, if you scroll fast enough
-    //  you can still see the tiles load in. A better solution might be to
-    //  load a lot more than necessary, cache it, and then load more once the
-    //  camera is near(ish) to the edge
-    private lastDrawTimestamp: number;
+    // The current appearance of the field, not necessarily of the whole field
+    private appearance: {
+        data: Array<Array<string>>,
+        rect: Rect
+    } | null;
 
     private gameOver: boolean;
 
@@ -116,11 +115,11 @@ export default class Game {
 
         this.camera.addEventListener('press', this.handlePress.bind(this));
         this.camera.addEventListener('longpress', this.handleLongPress.bind(this));
-        this.camera.addEventListener('move', this.draw.bind(this));
+        this.camera.addEventListener('move', this.draw.bind(this, false));
 
         this.modal = new ModalContainer();
-        this.drawWithLimit = limiter(this.draw.bind(this), 100);
-        this.lastDrawTimestamp = 0;
+        this.drawWithLimit = limiter(this.draw.bind(this, false), 100);
+        this.appearance = null;
 
         this.reset();
 
@@ -150,21 +149,47 @@ export default class Game {
         }
 
         // Once initialised, draw it
-        initialisePromise.then(this.draw.bind(this));
+        initialisePromise.then(this.draw.bind(this, true));
     }
 
-    public async draw() {
-        const now = Date.now();
-        // Max of 60 draws per second
-        if (now - this.lastDrawTimestamp > 1000 / 60) {
-            this.lastDrawTimestamp = now;
-            // Request the appearance of the board from Go
-            await goio.appearance(this.camera.visibleTiles)
-                // Then draw it
-                .then(this.camera.draw.bind(this.camera))
-                // Then draw the modal over top (if active)
-                .then(this.modal.draw.bind(this.modal));
+    private shouldRedraw(): boolean {
+        // Always redraw if there's no appearance
+        if (this.appearance == null) {
+            return true;
         }
+
+        // Get the visible tiles
+        const visibleTiles = this.camera.visibleTiles;
+
+        // If any edge of the visible rect is close(ish) to the edge of the appearance, redraw
+        return visibleTiles.x < this.appearance.rect.x + (this.appearance.rect.w / 6)
+            || visibleTiles.y < this.appearance.rect.y + (this.appearance.rect.h / 6)
+            || visibleTiles.x + visibleTiles.w > (this.appearance.rect.x + this.appearance.rect.w) - (this.appearance.rect.w / 6)
+            || visibleTiles.y + visibleTiles.h > (this.appearance.rect.y + this.appearance.rect.h) - (this.appearance.rect.h / 6);
+    }
+
+    public async draw(stateChanged?: boolean) {
+        // If a new appearance is required
+        if (stateChanged || this.shouldRedraw()) {
+            consoleLog('redrawing');
+            // The appearance to request is more than what is visible
+            const appearanceRect = this.camera.visibleTiles;
+            appearanceRect.x -= appearanceRect.w / 2;
+            appearanceRect.y -= appearanceRect.h / 2;
+            appearanceRect.w *= 2;
+            appearanceRect.h *= 2;
+
+            // Request the appearance
+            this.appearance = {
+                data: await goio.appearance(appearanceRect),
+                rect: appearanceRect
+            };
+        }
+
+        // Draw the appearance
+        await this.camera.draw(this.appearance.data)
+            // Then draw the modal over top (if active)
+            .then(this.modal.draw.bind(this.modal));
     }
 
     public registerEvents() {
@@ -204,7 +229,7 @@ export default class Game {
         const modal: Modal = new modalConstructor();
         this.modal.open(modal);
         // Add some common event handlers
-        modal.addEventListener('hover', this.draw.bind(this));
+        modal.addEventListener('hover', this.draw.bind(this, false));
         modal.addEventListener('press', (event: ElementPressEvent) => {
             switch (event.pressedElement) {
             case CLOSE_BUTTON.id:
@@ -235,14 +260,14 @@ export default class Game {
             if (event.button === 0) {
                 goio.uncover(event.pos)
                     .then(async state => {
-                        await this.draw();
+                        await this.draw(true);
                         this.handleState(state);
                     });
 
                 // Right mouse button
             } else if (event.button === 2) {
                 goio.flag(event.pos)
-                    .then(this.draw.bind(this));
+                    .then(this.draw.bind(this, true));
             }
 
             // If the game is over but the modal is hidden
@@ -256,7 +281,7 @@ export default class Game {
 
     private handleLongPress(event: PressEvent) {
         if (!this.gameOver && event.button === 0) {
-            goio.flag(event.pos).then(this.draw.bind(this));
+            goio.flag(event.pos).then(this.draw.bind(this, true));
         }
     }
 }
