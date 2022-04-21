@@ -9,7 +9,6 @@ function consoleLog(s) {
     Util.consoleLog('(camera) ' + s);
 }
 
-// todo limit presses (to prevent spam)
 // todo translate/scale on window resize
 // todo handle canvas that isn't fullscreen properly (though this isn't particularly useful)
 
@@ -25,7 +24,11 @@ const MOUSE_WHEEL_SCALE_FACTOR = 0.8;
 
 // Constant for how long a pointer needs to be pressed to be a "long press", in
 // milliseconds
-export const LONG_PRESS_DELAY_MS = 200;
+const LONG_PRESS_DELAY_MS = 200;
+
+// Constant for how long after a press event another
+// press event can be triggered (to prevent spamming)
+const PRESS_LIMIT_MS = 50;
 
 // todo pass useful information here, e.g. delta scale/translation
 export type MoveEvent = Record<string, never>
@@ -55,6 +58,8 @@ export default class Camera extends EventManager<CameraEventMap> {
         longPressTimeout: ReturnType<typeof setTimeout> | null
     };
 
+    private lastPressTimestamp;
+
     private readonly handleWheel;
     private readonly handlePointerDown;
     private readonly handlePointerMove;
@@ -76,6 +81,8 @@ export default class Camera extends EventManager<CameraEventMap> {
             distance: null,
             longPressTimeout: null
         };
+
+        this.lastPressTimestamp = 0;
 
         this.handleWheel = (event : WheelEvent) => {
             // Calculate the scale factor
@@ -270,13 +277,19 @@ export default class Camera extends EventManager<CameraEventMap> {
             // If the pointer didn't moveOrScale
             if (!this.pointerDownEvent.moveOrScale) {
                 consoleLog('pointerup: no movement or scaling, press event');
-                // Call the event listeners
-                this.callEventListeners('press', {
-                    pos: this.toWorldPos(
-                        this.pointerDownEvent.touches[0].clientX,
-                        this.pointerDownEvent.touches[0].clientY),
-                    button: event.button
-                });
+                const now = Date.now();
+                if (now - this.lastPressTimestamp > PRESS_LIMIT_MS) {
+                    this.lastPressTimestamp = now;
+                    // Call the event listeners
+                    this.callEventListeners('press', {
+                        pos: this.toWorldPos(
+                            this.pointerDownEvent.touches[0].clientX,
+                            this.pointerDownEvent.touches[0].clientY),
+                        button: event.button
+                    });
+                } else {
+                    consoleLog(`last press was ${now - this.lastPressTimestamp}ms ago, no event (min${PRESS_LIMIT_MS}ms)`);
+                }
             } else {
                 consoleLog('pointerup');
             }
