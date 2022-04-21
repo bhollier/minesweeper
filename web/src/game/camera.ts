@@ -30,6 +30,9 @@ const MOUSE_WHEEL_SCALE_FACTOR = 0.8;
 // milliseconds
 const LONG_PRESS_DELAY_MS = 200;
 
+// Constant for the minimum amount the mouse has to move to be considered a move event
+const MIN_MOUSE_MOVE_DISTANCE = 5;
+
 // Constant for how long after a press event another
 // press event can be triggered (to prevent spamming)
 const PRESS_LIMIT_MS = 50;
@@ -58,7 +61,8 @@ export default class Camera extends EventManager<CameraEventMap> {
     private pointerDownEvent : {
         touches: Array<PointerEvent>
         moveOrScale: boolean,
-        distance: number | null,
+        moveDistance: number,
+        pinchDistance: number | null,
         longPressTimeout: ReturnType<typeof setTimeout> | null
     };
 
@@ -82,7 +86,8 @@ export default class Camera extends EventManager<CameraEventMap> {
         this.pointerDownEvent = {
             touches: [],
             moveOrScale: false,
-            distance: null,
+            moveDistance: 0,
+            pinchDistance: null,
             longPressTimeout: null
         };
 
@@ -118,13 +123,11 @@ export default class Camera extends EventManager<CameraEventMap> {
                             this.pointerDownEvent.touches[0].clientY),
                         button: event.button
                     });
-
-                    // Reset the touches
-                    this.pointerDownEvent.touches = [];
                 }, LONG_PRESS_DELAY_MS);
                 // Reset the other fields
                 this.pointerDownEvent.moveOrScale = false;
-                this.pointerDownEvent.distance = null;
+                this.pointerDownEvent.moveDistance = 0;
+                this.pointerDownEvent.pinchDistance = null;
             } else {
                 consoleLog('another pointerdown');
             }
@@ -154,13 +157,18 @@ export default class Camera extends EventManager<CameraEventMap> {
                     x: event.clientX - previousTouch.clientX,
                     y: event.clientY - previousTouch.clientY
                 };
-                // Don't register as a moveOrScale event if the pointer only moved half a tile (no
-                // scaling)
+                const distance = Math.hypot(delta.x, delta.y);
+
+                // Add it to the move distance
+                this.pointerDownEvent.moveDistance += distance;
+
+                // Don't register as a moveOrScale event if the pointer didn't move much
+                // todo maybe reset long press timeout if the delta is > 0
                 if (!this.pointerDownEvent.moveOrScale &&
-                    Math.abs(delta.x) < TILE_DRAW_SIZE / 4 &&
-                    Math.abs(delta.y) < TILE_DRAW_SIZE / 4) {
+                    this.pointerDownEvent.moveDistance < MIN_MOUSE_MOVE_DISTANCE) {
                     return;
                 }
+
                 // Translate the camera
                 this.translation.x += delta.x;
                 this.translation.y += delta.y;
@@ -201,10 +209,10 @@ export default class Camera extends EventManager<CameraEventMap> {
                     touch0.clientX - touch1.clientX,
                     touch0.clientY - touch1.clientY);
 
-                // If a previous distance has been calculated
-                if (this.pointerDownEvent.distance != null) {
+                // If a previous pinch distance has been calculated
+                if (this.pointerDownEvent.pinchDistance != null) {
                     // Calculate the scale factor
-                    const factor = distance / this.pointerDownEvent.distance;
+                    const factor = distance / this.pointerDownEvent.pinchDistance;
 
                     // Calculate the center of the zoom
                     const center = {
@@ -217,7 +225,7 @@ export default class Camera extends EventManager<CameraEventMap> {
                 }
 
                 // Set the distance
-                this.pointerDownEvent.distance = distance;
+                this.pointerDownEvent.pinchDistance = distance;
             }
 
             // Set the pointer as having moved (so the user doesn't flag something by
@@ -250,8 +258,8 @@ export default class Camera extends EventManager<CameraEventMap> {
                 // Remove the pointer's touch
                 this.pointerDownEvent.touches = this.pointerDownEvent.touches.filter(
                     e => e.pointerId !== event.pointerId);
-                // Remove the distance
-                this.pointerDownEvent.distance = null;
+                // Remove the pinch distance
+                this.pointerDownEvent.pinchDistance = null;
             } else {
                 consoleLog('pointerout: no press event');
                 // Clear the event
@@ -274,7 +282,7 @@ export default class Camera extends EventManager<CameraEventMap> {
                 this.pointerDownEvent.touches = this.pointerDownEvent.touches.filter(
                     e => e.pointerId !== event.pointerId);
                 // Remove the distance
-                this.pointerDownEvent.distance = null;
+                this.pointerDownEvent.pinchDistance = null;
                 return;
             }
 
@@ -358,22 +366,22 @@ export default class Camera extends EventManager<CameraEventMap> {
         // Clear the canvas (for now)
         ctx.clearRect(0, 0, w, h);
 
-        // Iterate over the tiles
-        for (const yKey in tileData) {
-            // We have to use the 'in' syntax, as tileData might not be 0...tileData.length
-            const y = Number(yKey);
-            for (const xKey in tileData[y]) {
-                const x = Number(xKey);
-                // Get the sprite
-                const sprite = SPRITES.TILES[tileData[y][x]];
-                // Calculate the position of the tile on the canvas
-                const pos = this.toCanvasPos(x, y);
-                drawSprite(sprite, {
-                    // The position of the tile to draw to
-                    x: pos.x, y: pos.y,
-                    // The size of the tile to draw to
-                    w: TILE_DRAW_SIZE * this.scale, h: TILE_DRAW_SIZE * this.scale
-                });
+        // Iterate over the visible tiles
+        const visibleRect = this.visibleTiles;
+        for (let y = visibleRect.y; y < visibleRect.y + visibleRect.h; y++) {
+            for (let x = visibleRect.x; x < visibleRect.x + visibleRect.w; x++) {
+                if (tileData[y][x]) {
+                    // Get the sprite
+                    const sprite = SPRITES.TILES[tileData[y][x]];
+                    // Calculate the position of the tile on the canvas
+                    const pos = this.toCanvasPos(x, y);
+                    drawSprite(sprite, {
+                        // The position of the tile to draw to
+                        x: pos.x, y: pos.y,
+                        // The size of the tile to draw to
+                        w: TILE_DRAW_SIZE * this.scale, h: TILE_DRAW_SIZE * this.scale
+                    });
+                }
             }
         }
     }

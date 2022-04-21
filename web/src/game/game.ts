@@ -101,6 +101,7 @@ export default class Game {
         data: Array<Array<string>>,
         rect: Rect
     } | null;
+    private lastAppearanceRequestTimestamp: number;
 
     private gameOver: boolean;
 
@@ -120,6 +121,7 @@ export default class Game {
         this.modal = new ModalContainer();
         this.drawWithLimit = limiter(this.draw.bind(this, false), 100);
         this.appearance = null;
+        this.lastAppearanceRequestTimestamp = 0;
 
         this.reset();
 
@@ -152,10 +154,16 @@ export default class Game {
         initialisePromise.then(this.draw.bind(this, true));
     }
 
-    private shouldRedraw(): boolean {
-        // Always redraw if there's no appearance
+    private shouldUpdateAppearance(): boolean {
+        // Always request if there's no appearance
         if (this.appearance == null) {
             return true;
+        }
+
+        // Don't request too often
+        const now = Date.now();
+        if (now - this.lastAppearanceRequestTimestamp < 100) {
+            return false;
         }
 
         // Get the visible tiles
@@ -170,19 +178,20 @@ export default class Game {
 
     public async draw(stateChanged?: boolean) {
         // If a new appearance is required
-        if (stateChanged || this.shouldRedraw()) {
-            consoleLog('redrawing');
+        if (stateChanged || this.shouldUpdateAppearance()) {
             // The appearance to request is more than what is visible
-            const appearanceRect = this.camera.visibleTiles;
-            appearanceRect.x -= appearanceRect.w / 2;
-            appearanceRect.y -= appearanceRect.h / 2;
-            appearanceRect.w *= 2;
-            appearanceRect.h *= 2;
+            const rect = this.camera.visibleTiles;
+            rect.x -= rect.w / 2;
+            rect.y -= rect.h / 2;
+            rect.w *= 2;
+            rect.h *= 2;
+            consoleLog(`redrawing, rect x${rect.x} y ${rect.y} w ${rect.w} h ${rect.h}`);
 
             // Request the appearance
+            this.lastAppearanceRequestTimestamp = Date.now();
             this.appearance = {
-                data: await goio.appearance(appearanceRect),
-                rect: appearanceRect
+                data: await goio.appearance(rect),
+                rect
             };
         }
 
