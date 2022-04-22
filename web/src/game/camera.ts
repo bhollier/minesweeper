@@ -370,7 +370,7 @@ export default class Camera extends EventManager<CameraEventMap> {
         const visibleRect = this.visibleTiles;
         for (let y = visibleRect.y; y < visibleRect.y + visibleRect.h; y++) {
             for (let x = visibleRect.x; x < visibleRect.x + visibleRect.w; x++) {
-                if (tileData[y][x]) {
+                if (tileData[y] && tileData[y][x]) {
                     // Get the sprite
                     const sprite = SPRITES.TILES[tileData[y][x]];
                     // Calculate the position of the tile on the canvas
