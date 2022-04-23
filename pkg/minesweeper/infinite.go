@@ -161,19 +161,8 @@ func (g *InfiniteGame) Uncover(x, y int) (s GameState) {
 
 		// If the tile is a mine
 		if chunk[chunkPos.Y][chunkPos.X].mine {
-			// todo discover the mines of the surrounding chunks
-			// Find the mines
-			for y2, row := range chunk {
-				for x2, tile := range row {
-					// If the tile is a mine
-					if tile.mine {
-						// Set the tile as discovered
-						chunk[y2][x2].discovered = true
-					}
-				}
-			}
-			// Set the game's state
-			g.state = GameStateLoss
+			// This is infinite mode, so just set the tile as discovered and return
+			chunk[chunkPos.Y][chunkPos.X].discovered = true
 			return
 		}
 	}
