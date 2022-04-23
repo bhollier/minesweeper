@@ -76,4 +76,4 @@ mainMenu.addEventListener('press', (event : ElementPressEvent) => {
 });
 
 // Draw the main menu once the spritesheet has loaded
-spritesheetLoaded.then(mainMenu.draw.bind(mainMenu));
+spritesheetLoaded.then(() => mainMenu.draw());

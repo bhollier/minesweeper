@@ -1,16 +1,15 @@
-import {SPRITES, canvas, ctx, drawSprite} from '../draw';
+import {SPRITES, canvas, drawSprite} from '../draw';
 
 import EventManager from '../event-manager';
 
 import * as Util from '../util';
-import {Pos, Rect, Size} from '../common';
+import {Pos, Rect, Size, intersect} from '../common';
 
 function consoleLog(s) {
     Util.consoleLog('(camera) ' + s);
 }
 
 // todo translate/scale on window resize
-// todo handle canvas that isn't fullscreen properly (though this isn't particularly useful)
 
 // Constant for the draw size of a tile
 const TILE_DRAW_SIZE = 30;
@@ -53,6 +52,7 @@ interface CameraEventMap {
 }
 
 export default class Camera extends EventManager<CameraEventMap> {
+    private bounds: Rect;
     private readonly fieldSize: Size | undefined;
 
     private translation: Pos;
@@ -75,9 +75,11 @@ export default class Camera extends EventManager<CameraEventMap> {
     private readonly handlePointerOut;
     private readonly handlePointerUp;
 
-    constructor(fieldSize?: Size) {
+    // todo bounding box (for top bar)
+    constructor(bounds: Rect, fieldSize?: Size) {
         super();
 
+        this.bounds = bounds;
         this.fieldSize = fieldSize;
 
         // Reset the camera
@@ -94,50 +96,56 @@ export default class Camera extends EventManager<CameraEventMap> {
         this.lastPressTimestamp = 0;
 
         this.handleWheel = (event : WheelEvent) => {
-            // Calculate the scale factor
-            const factor = event.deltaY > 0 ? MOUSE_WHEEL_SCALE_FACTOR : 1 / MOUSE_WHEEL_SCALE_FACTOR;
+            if (this.intersect(event)) {
+                event.preventDefault();
 
-            // Zoom the camera
-            this.zoom(factor, event.clientX, event.clientY);
+                // Calculate the scale factor
+                const factor = event.deltaY > 0 ? MOUSE_WHEEL_SCALE_FACTOR : 1 / MOUSE_WHEEL_SCALE_FACTOR;
+
+                // Zoom the camera
+                this.zoom(factor, event.clientX, event.clientY);
+            }
         };
 
         this.handlePointerDown = (event: PointerEvent) => {
-            event.preventDefault();
+            // We only care about pointers that are in the bounds of the camera
+            if (this.intersect(event)) {
+                event.preventDefault();
 
-            // If this is the first pointer event
-            if (this.pointerDownEvent.touches.length == 0) {
-                consoleLog('first pointerdown');
-                // Set the timeout for long presses
-                this.pointerDownEvent.longPressTimeout = setTimeout(() => {
-                    // Make sure there was a pointer down event
-                    if (this.pointerDownEvent.touches.length === 0 ||
-                        this.pointerDownEvent.moveOrScale) {
-                        return;
-                    }
-                    consoleLog('longpress timeout');
+                // If this is the first pointer event
+                if (this.pointerDownEvent.touches.length == 0) {
+                    consoleLog('first pointerdown');
+                    // Set the timeout for long presses
+                    this.pointerDownEvent.longPressTimeout = setTimeout(() => {
+                        // Make sure there was a pointer down event
+                        if (this.pointerDownEvent.touches.length === 0 ||
+                            this.pointerDownEvent.moveOrScale) {
+                            return;
+                        }
+                        consoleLog('longpress timeout');
 
-                    // Call the event listeners
-                    this.callEventListeners('longpress', {
-                        pos: this.toWorldPos(
-                            this.pointerDownEvent.touches[0].clientX,
-                            this.pointerDownEvent.touches[0].clientY),
-                        button: event.button
-                    });
-                }, LONG_PRESS_DELAY_MS);
-                // Reset the other fields
-                this.pointerDownEvent.moveOrScale = false;
-                this.pointerDownEvent.moveDistance = 0;
-                this.pointerDownEvent.pinchDistance = null;
-            } else {
-                consoleLog('another pointerdown');
+                        // Call the event listeners
+                        this.callEventListeners('longpress', {
+                            pos: this.toWorldPos(
+                                this.pointerDownEvent.touches[0].clientX,
+                                this.pointerDownEvent.touches[0].clientY),
+                            button: event.button
+                        });
+                    }, LONG_PRESS_DELAY_MS);
+                    // Reset the other fields
+                    this.pointerDownEvent.moveOrScale = false;
+                    this.pointerDownEvent.moveDistance = 0;
+                    this.pointerDownEvent.pinchDistance = null;
+                } else {
+                    consoleLog('another pointerdown');
+                }
+
+                // Add the pointer event
+                this.pointerDownEvent.touches.push(event);
             }
-
-            // Add the pointer event
-            this.pointerDownEvent.touches.push(event);
         };
 
         this.handlePointerMove = (event: PointerEvent) => {
-            event.preventDefault();
             if (this.pointerDownEvent.touches.length === 0) {
                 return;
             }
@@ -145,6 +153,11 @@ export default class Camera extends EventManager<CameraEventMap> {
             // Get the index of the previous touch event
             const previousTouchIndex = this.pointerDownEvent.touches.findIndex(
                 e => e.pointerId === event.pointerId);
+            if (previousTouchIndex === -1) {
+                return;
+            }
+            event.preventDefault();
+
             // Save the previous touch
             const previousTouch = this.pointerDownEvent.touches[previousTouchIndex];
             // Update the touch event
@@ -186,8 +199,8 @@ export default class Camera extends EventManager<CameraEventMap> {
                         y: 0 - (fieldRealSize.y / 2)
                     };
                     const max = {
-                        x: canvas.width - (fieldRealSize.x / 2),
-                        y: canvas.height - (fieldRealSize.y / 2)
+                        x: this.bounds.w - (fieldRealSize.x / 2),
+                        y: this.bounds.h - (fieldRealSize.y / 2)
                     };
 
                     // Limit the translation
@@ -246,11 +259,18 @@ export default class Camera extends EventManager<CameraEventMap> {
         };
         
         this.handlePointerOut = (event: PointerEvent) => {
-            event.preventDefault();
             // Make sure there was a pointer down event
             if (this.pointerDownEvent.touches.length == 0) {
                 return;
             }
+
+            const touchIndex = this.pointerDownEvent.touches.findIndex(
+                e => e.pointerId === event.pointerId);
+            if (touchIndex === -1) {
+                return;
+            }
+
+            event.preventDefault();
 
             // If there are multiple pointers
             if (this.pointerDownEvent.touches.length > 1) {
@@ -269,11 +289,18 @@ export default class Camera extends EventManager<CameraEventMap> {
         };
 
         this.handlePointerUp = (event: PointerEvent) => {
-            event.preventDefault();
             // Make sure there was a pointer down event
             if (this.pointerDownEvent.touches.length === 0) {
                 return;
             }
+
+            const touchIndex = this.pointerDownEvent.touches.findIndex(
+                e => e.pointerId === event.pointerId);
+            if (touchIndex === -1) {
+                return;
+            }
+
+            event.preventDefault();
 
             // If there are multiple pointers
             if (this.pointerDownEvent.touches.length > 1) {
@@ -314,29 +341,33 @@ export default class Camera extends EventManager<CameraEventMap> {
         this.registerEvents();
     }
 
-    // Returns the translation so the game field is in the middle of the canvas
+    private intersect(event: MouseEvent): boolean {
+        return intersect({x: event.clientX, y: event.clientY}, this.bounds);
+    }
+
+    // Returns the translation so the game field is in the middle of the bounds
     private middleTranslation(): Pos {
         // If there's no field size, the middle is just 0, 0
         if (this.fieldSize === undefined) {
             return {x: 0, y: 0};
         }
         return {
-            x: (canvas.width / 2) - (this.scale * ((this.fieldSize.w * TILE_DRAW_SIZE) / 2)),
-            y: (canvas.height / 2) - (this.scale * ((this.fieldSize.h * TILE_DRAW_SIZE) / 2))
+            x: (this.bounds.w / 2) - (this.scale * ((this.fieldSize.w * TILE_DRAW_SIZE) / 2)),
+            y: (this.bounds.h / 2) - (this.scale * ((this.fieldSize.h * TILE_DRAW_SIZE) / 2))
         };
     }
 
     public toCanvasPos(x, y: number): Pos {
         return {
-            x: this.translation.x + (x * TILE_DRAW_SIZE * this.scale),
-            y: this.translation.y + (y * TILE_DRAW_SIZE * this.scale),
+            x: this.bounds.x + this.translation.x + (x * TILE_DRAW_SIZE * this.scale),
+            y: this.bounds.y + this.translation.y + (y * TILE_DRAW_SIZE * this.scale),
         };
     }
 
     public toWorldPos(x, y: number): Pos {
         return {
-            x: Math.floor(((x - this.translation.x) / this.scale) / TILE_DRAW_SIZE),
-            y: Math.floor(((y - this.translation.y) / this.scale) / TILE_DRAW_SIZE),
+            x: Math.floor(((x - this.translation.x - this.bounds.x) / this.scale) / TILE_DRAW_SIZE),
+            y: Math.floor(((y - this.translation.y - this.bounds.y) / this.scale) / TILE_DRAW_SIZE),
         };
     }
 
@@ -360,12 +391,6 @@ export default class Camera extends EventManager<CameraEventMap> {
     }
 
     public async draw(tileData: Array<Array<string>>) {
-        // The canvas width and height
-        const w = canvas.width, h = canvas.height;
-
-        // Clear the canvas (for now)
-        ctx.clearRect(0, 0, w, h);
-
         // Iterate over the visible tiles
         const visibleRect = this.visibleTiles;
         for (let y = visibleRect.y; y < visibleRect.y + visibleRect.h; y++) {
@@ -387,17 +412,13 @@ export default class Camera extends EventManager<CameraEventMap> {
     }
 
     public get visibleTiles(): Rect {
-        const canvasRect = canvas.getBoundingClientRect();
-
-        const tileSize = TILE_DRAW_SIZE * this.scale;
-
-        const min = this.toWorldPos(canvasRect.left - tileSize, canvasRect.top - tileSize);
-        const max = this.toWorldPos(canvasRect.right + tileSize, canvasRect.bottom + tileSize);
+        const min = this.toWorldPos(this.bounds.x, this.bounds.y);
+        const max = this.toWorldPos(this.bounds.x + this.bounds.w, this.bounds.y + this.bounds.h);
         return {
-            x: min.x,
-            y: min.y,
-            w: max.x - min.x,
-            h: max.y - min.y,
+            x: min.x - 1,
+            y: min.y - 1,
+            w: max.x - min.x + 2,
+            h: max.y - min.y + 2,
         };
     }
 
@@ -405,10 +426,10 @@ export default class Camera extends EventManager<CameraEventMap> {
     public reset() {
         // If the field size is set
         if (this.fieldSize !== undefined) {
-            // Fit the game in the canvas
+            // Fit the game in the bounds
             this.scale = Math.min(
-                canvas.width / (this.fieldSize.w * TILE_DRAW_SIZE * 1.1),
-                canvas.height / (this.fieldSize.h * TILE_DRAW_SIZE * 1.1));
+                this.bounds.w / (this.fieldSize.w * TILE_DRAW_SIZE * 1.1),
+                this.bounds.h / (this.fieldSize.h * TILE_DRAW_SIZE * 1.1));
             // Restrict the scale
             this.scale = Math.max(this.scale, MIN_SCALE);
             this.scale = Math.min(this.scale, MAX_SCALE);
@@ -420,6 +441,16 @@ export default class Camera extends EventManager<CameraEventMap> {
 
         // Translate to the middle
         this.translation = this.middleTranslation();
+    }
+
+    // Resize the camera's bounding box
+    public resize(bounds: Rect) {
+        // Translate the canvas
+        this.translation.x += (bounds.w - this.bounds.w) / 2;
+        this.translation.y += (bounds.h - this.bounds.h) / 2;
+
+        // Set the new bounds
+        this.bounds = bounds;
     }
 
     public registerEvents() {

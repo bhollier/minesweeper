@@ -13,17 +13,18 @@ export function cloneObj(o) {
     return JSON.parse(JSON.stringify(o));
 }
 
-const timeoutIdForFunc = new Map<TimerHandler, number>();
+export function formatNumber(n: number, maxDigits?: number, padding?: boolean): string {
+    if (maxDigits !== undefined) {
+        n = Math.min(n, Math.pow(10, maxDigits) - 1);
+        n = Math.max(n, -(Math.pow(10, maxDigits) - 1));
+    }
 
-// Returns a function that only calls func if there have
-// been no calls to the returned function in delay milliseconds.
-// Useful for preventing excessive calls from event handlers (e.g. not drawing on every resize event)
-export function limiter(func: TimerHandler, delay: number) {
-    return () => {
-        const id = timeoutIdForFunc.get(func);
-        if (id) {
-            clearTimeout(id);
-        }
-        timeoutIdForFunc.set(func, setTimeout(func, delay));
-    };
+    let nStr = n.toString(10);
+
+    // Don't add padding to negative numbers
+    if (padding && n >= 0) {
+        nStr = [...Array(maxDigits - nStr.length)].map(() => '0').join('').concat(nStr);
+    }
+
+    return nStr;
 }

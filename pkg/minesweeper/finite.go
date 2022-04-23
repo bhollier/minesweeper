@@ -12,6 +12,7 @@ type FiniteGame struct {
 	field          [][]Tile
 	state          GameState
 	startTime      time.Time
+	flags          int
 }
 
 // NewGame creates a new, finite minesweeper game
@@ -137,17 +138,25 @@ func (g *FiniteGame) Uncover(x, y int) (s GameState) {
 	return
 }
 
-func (g *FiniteGame) Flag(x, y int) {
+func (g *FiniteGame) Flag(x, y int) float64 {
 	// If the x or y is out of range, the cell is already discovered, or the
 	// game has ended
 	if x < 0 || x >= g.w || y < 0 || y >= g.h ||
 		g.field[y][x].Discovered || g.state > GameStatePlaying {
 		// Nothing needs to be done, so return
-		return
+		return float64(g.numMines - g.flags)
 	}
 
 	// Invert the flag field
 	g.field[y][x].Flagged = !g.field[y][x].Flagged
+
+	if g.field[y][x].Flagged {
+		g.flags++
+	} else {
+		g.flags--
+	}
+
+	return float64(g.numMines - g.flags)
 }
 
 func (g *FiniteGame) State() GameState {

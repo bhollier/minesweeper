@@ -35,6 +35,10 @@ export function uncover(data: UncoverRequestData): Promise<UncoverResponseData> 
 
 export type FlagRequestData = Pos
 
-export function flag(data: FlagRequestData): Promise<void> {
+export type FlagResponseData = {
+    remainingMines: number
+}
+
+export function flag(data: FlagRequestData): Promise<FlagResponseData> {
     return postMessage('flag', data);
 }

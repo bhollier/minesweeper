@@ -3,6 +3,7 @@ package webio
 import (
 	"fmt"
 	ms "github.com/bhollier/minesweeper/pkg/minesweeper"
+	"math"
 	"strconv"
 	"syscall/js"
 	"time"
@@ -142,6 +143,19 @@ func statePayload(s ms.GameState, timer time.Duration) map[string]interface{} {
 	}
 }
 
+func flagPayload(remaining float64) map[string]interface{} {
+	var remainingMines interface{}
+	if math.IsInf(remaining, 1) {
+		remainingMines = js.Global().Get("Infinity")
+	} else {
+		remainingMines = remaining
+	}
+
+	return map[string]interface{}{
+		"remainingMines": remainingMines,
+	}
+}
+
 func (io *WebIO) handleAppearance(msg Message) {
 	x, y, w, h := msg.Data.Get("x").Int(), msg.Data.Get("y").Int(),
 		msg.Data.Get("w").Int(), msg.Data.Get("h").Int()
@@ -154,8 +168,8 @@ func (io *WebIO) handleUncover(msg Message) {
 }
 
 func (io *WebIO) handleFlag(msg Message) {
-	io.game.Flag(msg.Data.Get("x").Int(), msg.Data.Get("y").Int())
-	sendSuccess(msg)
+	remaining := io.game.Flag(msg.Data.Get("x").Int(), msg.Data.Get("y").Int())
+	sendSuccessWithPayload(msg, flagPayload(remaining))
 }
 
 /*

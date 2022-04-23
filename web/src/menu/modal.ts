@@ -8,7 +8,7 @@ const MODAL_GRID_SIZE = 10;
 
 export const CLOSE_BUTTON: Element = {
     id: 'modal.close_button',
-    sprite: SPRITES.TILES.CLOSE,
+    sprite: SPRITES.ICONS.CROSS,
     scale: 1
 };
 
@@ -56,26 +56,26 @@ export default class Modal extends Menu {
                     // todo draw the background properly
                     let sprite = {
                         // Pick the center pixel
-                        x: SPRITES.TILES.EMPTY.w / 2,
-                        y: SPRITES.TILES.EMPTY.h / 2,
+                        x: SPRITES.TILES.EMPTY.x + (SPRITES.TILES.EMPTY.w / 2),
+                        y: SPRITES.TILES.EMPTY.y + (SPRITES.TILES.EMPTY.h / 2),
                         w: 1, h: 1
                     } as Rect;
-                    // If the tile should be a corner
+
+                    // If the tile should be a border
                     if (x === 0 || x === MODAL_GRID_SIZE - 1 ||
                         y === 0 || y === MODAL_GRID_SIZE - 1) {
-                        // If the tile is in the upper right corner
-                        if (x === MODAL_GRID_SIZE - 1 && y === 0) {
-                            // The element is the close button
-                            sprite = CLOSE_BUTTON.sprite;
-                            // Add the hitbox to the menu
-                            this.elementHitboxes.set(CLOSE_BUTTON.id, hitbox);
-
-                        } else {
-                            sprite = SPRITES.TILES.HIDDEN;
-                        }
+                        sprite = SPRITES.TILES.HIDDEN;
                     }
 
                     drawSprite(sprite, hitbox);
+
+                    // If the tile is in the upper right corner
+                    if (x === MODAL_GRID_SIZE - 1 && y === 0) {
+                        // Draw the cross icon
+                        drawSprite(CLOSE_BUTTON.sprite, hitbox);
+                        // Add the hitbox to the menu
+                        this.elementHitboxes.set(CLOSE_BUTTON.id, hitbox);
+                    }
                 }
             }
 

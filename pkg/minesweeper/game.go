@@ -63,8 +63,10 @@ type Game interface {
 	Uncover(x, y int) (s GameState)
 
 	// Flag the tile at the given coordinate. If the tile is already flagged it is
-	// unflagged
-	Flag(x, y int)
+	// unflagged. Returns the number of "remaining mines" (assuming every flag is perfect,
+	// so this number can be negative) as a floating point number, as the remaining for
+	// infinite minesweeper is math.Inf(1)
+	Flag(x, y int) float64
 
 	// State returns the game's current state
 	State() GameState

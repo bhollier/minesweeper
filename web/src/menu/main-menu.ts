@@ -1,7 +1,6 @@
 import Menu, {Element} from './menu';
 import {SPRITES, clear} from '../draw';
 
-import {limiter} from '../util';
 import {pos} from '../common';
 
 const TITLE: Element = {
@@ -55,30 +54,29 @@ export const INFINITE_BUTTON: Element = {
 const ELEMENTS: Array<Element> = [TITLE, EASY_BUTTON, MEDIUM_BUTTON, HARD_BUTTON/*, CUSTOM_BUTTON*/, INFINITE_BUTTON];
 
 export default class MainMenu extends Menu {
-    private readonly drawWithLimit: () => void;
+    private readonly handleResize: () => void;
 
     constructor() {
         super(ELEMENTS);
-        super.addEventListener('press', this.draw.bind(this));
-        super.addEventListener('hover', this.draw.bind(this));
+        super.addEventListener('press', () => this.draw());
+        super.addEventListener('hover', () => this.draw());
 
-        // The draw function with a limiter, to prevent flickering when resizing
-        this.drawWithLimit = limiter(this.draw.bind(this), 100);
+        this.handleResize = () => this.draw();
 
         this.registerEvents();
     }
 
     async draw() {
-        return clear().then(super.draw.bind(this));
+        return clear().then(() => super.draw());
     }
 
     registerEvents() {
         super.registerEvents();
-        window.addEventListener('resize', this.drawWithLimit);
+        window.addEventListener('resize', this.handleResize);
     }
 
     deregisterEvents() {
         super.deregisterEvents();
-        window.removeEventListener('resize', this.drawWithLimit);
+        window.removeEventListener('resize', this.handleResize);
     }
 }

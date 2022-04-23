@@ -1,7 +1,7 @@
 import {canvas, drawSprite} from '../draw';
 import EventManager from '../event-manager';
 
-import {Pos, Rect} from '../common';
+import {Pos, Rect, intersect} from '../common';
 import {cloneObj} from '../util';
 
 export type Hitbox = Rect
@@ -17,16 +17,6 @@ export type Element = {
 const biggestElementByField = (elements: Array<Element>, field: string) =>
     elements.reduce((prev, curr) =>
         prev.sprite[field] * prev.scale > curr.sprite[field] * curr.scale ? prev : curr);
-
-function getAbsPos(x, y: number) {
-    const rect = canvas.getBoundingClientRect();
-    return [Math.round(x - rect.left), Math.round(y - rect.top)];
-}
-
-function intersect(x, y: number, hitbox: Hitbox) {
-    return x > hitbox.x && y > hitbox.y &&
-        x < hitbox.x + hitbox.w && y < hitbox.y + hitbox.h;
-}
 
 export type ElementPressEvent = {
     pressedElement: string
@@ -63,12 +53,10 @@ export default class Menu extends EventManager<MenuEventMap> {
         this.hoveredElement = null;
 
         this.handlePointerMove = (event: PointerEvent) => {
-            // Calculate the absolute X and Y of the button press
-            const [x, y] = getAbsPos(event.clientX, event.clientY);
             // Iterate over the menu elements
             for (const [element, hitbox] of this.elementHitboxes.entries()) {
                 // If the pointer intersected the menu item
-                if (intersect(x, y, hitbox)) {
+                if (intersect({x: event.clientX, y: event.clientY}, hitbox)) {
                     // If this is newly hovered
                     if (this.hoveredElement !== element) {
                         // Set the element
@@ -91,12 +79,10 @@ export default class Menu extends EventManager<MenuEventMap> {
         };
 
         this.handlePointerDown = (event: PointerEvent) => {
-            // Calculate the absolute X and Y of the button press
-            const [x, y] = getAbsPos(event.clientX, event.clientY);
             // Iterate over the menu elements
             for (const [element, hitbox] of this.elementHitboxes.entries()) {
                 // If the pointer intersected the menu item
-                if (intersect(x, y, hitbox)) {
+                if (intersect({x: event.clientX, y: event.clientY}, hitbox)) {
                     this.callEventListeners('press', {
                         pressedElement: element
                     });
@@ -169,12 +155,12 @@ export default class Menu extends EventManager<MenuEventMap> {
     }
 
     public registerEvents() {
-        window.addEventListener('pointermove', this.handlePointerMove);
-        window.addEventListener('pointerdown', this.handlePointerDown);
+        canvas.addEventListener('pointermove', this.handlePointerMove);
+        canvas.addEventListener('pointerdown', this.handlePointerDown);
     }
 
     public deregisterEvents() {
-        window.removeEventListener('pointermove', this.handlePointerMove);
-        window.removeEventListener('pointerdown', this.handlePointerDown);
+        canvas.removeEventListener('pointermove', this.handlePointerMove);
+        canvas.removeEventListener('pointerdown', this.handlePointerDown);
     }
 }

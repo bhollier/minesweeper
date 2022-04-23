@@ -1,4 +1,4 @@
-import {Rect} from './common';
+import {Pos, Rect, Size} from './common';
 import {consoleLog} from './util';
 
 // Constant for the size of a tile in the spritesheet
@@ -20,8 +20,7 @@ export const SPRITES = {
         8: {x: 80, y: 0, w: TILE_SIZE, h: TILE_SIZE} as Rect,
         MINE: {x: 90, y: 0, w: TILE_SIZE, h: TILE_SIZE} as Rect,
         HIDDEN: {x: 100, y: 0, w: TILE_SIZE, h: TILE_SIZE} as Rect,
-        FLAG: {x: 110, y: 0, w: TILE_SIZE, h: TILE_SIZE} as Rect,
-        CLOSE: {x: 120, y: 0, w: TILE_SIZE, h: TILE_SIZE} as Rect
+        FLAG: {x: 110, y: 0, w: TILE_SIZE, h: TILE_SIZE} as Rect
     },
 
     MODAL: {
@@ -53,6 +52,25 @@ export const SPRITES = {
         TITLE: {x: 0, y: 100, w: 52, h: ROW_HEIGHT} as Rect,
         RESET: {x: 0, y: 110, w: 53, h: ROW_HEIGHT} as Rect,
         RESET_HOVERED: {x: 53, y: 110, w: 53, h: ROW_HEIGHT} as Rect,
+    },
+
+    ICONS: {
+        0: {x: 0, y: 120, w: 7, h: ROW_HEIGHT} as Rect,
+        1: {x: 7, y: 120, w: 7, h: ROW_HEIGHT} as Rect,
+        2: {x: 14, y: 120, w: 7, h: ROW_HEIGHT} as Rect,
+        3: {x: 21, y: 120, w: 7, h: ROW_HEIGHT} as Rect,
+        4: {x: 28, y: 120, w: 7, h: ROW_HEIGHT} as Rect,
+        5: {x: 35, y: 120, w: 7, h: ROW_HEIGHT} as Rect,
+        6: {x: 42, y: 120, w: 7, h: ROW_HEIGHT} as Rect,
+        7: {x: 49, y: 120, w: 7, h: ROW_HEIGHT} as Rect,
+        8: {x: 56, y: 120, w: 7, h: ROW_HEIGHT} as Rect,
+        9: {x: 63, y: 120, w: 7, h: ROW_HEIGHT} as Rect,
+        ':': {x: 70, y: 120, w: 7, h: ROW_HEIGHT} as Rect,
+        '-': {x: 77, y: 120, w: 7, h: ROW_HEIGHT} as Rect,
+        INFINITY: {x: 84, y: 120, w: 14, h: ROW_HEIGHT} as Rect,
+        CLOCK: {x: 98, y: 120, w: 10, h: ROW_HEIGHT} as Rect,
+        CROSS: {x: 108, y: 120, w: 10, h: ROW_HEIGHT} as Rect,
+        MINE: {x: 0, y: 10, w: 10, h: ROW_HEIGHT} as Rect
     }
 };
 
@@ -89,4 +107,25 @@ export function drawSprite(sprite: Rect, drawRect: Rect) {
     ctx.drawImage(spritesheet,
         sprite.x, sprite.y, sprite.w, sprite.h,
         drawRect.x, drawRect.y, drawRect.w, drawRect.h);
+}
+
+export function numberDrawWidth(number: string, drawHeight: number): number {
+    return ((drawHeight / ROW_HEIGHT) * SPRITES.ICONS['0'].w) * number.length;
+}
+
+export function drawNumber(number: string, drawPos: Pos, drawHeight: number) {
+    const drawSize: Size = {
+        w: (drawHeight / ROW_HEIGHT) * SPRITES.ICONS['0'].w,
+        h: drawHeight
+    };
+    let x = drawPos.x;
+    for (const digit of number) {
+        const drawRect: Rect = {
+            x,
+            y: drawPos.y,
+            ...drawSize
+        };
+        drawSprite(SPRITES.ICONS[digit], drawRect);
+        x += drawRect.w;
+    }
 }

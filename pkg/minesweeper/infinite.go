@@ -2,6 +2,7 @@ package minesweeper
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"time"
 )
@@ -211,7 +212,10 @@ func (g *InfiniteGame) Uncover(x, y int) (s GameState) {
 	return
 }
 
-func (g *InfiniteGame) Flag(x, y int) {
+// Flag the tile at the given coordinate, always returns Int.MAX_VALUE
+func (g *InfiniteGame) Flag(x, y int) (remaining float64) {
+	remaining = math.Inf(1)
+
 	// If the game has ended
 	if g.state > GameStatePlaying {
 		// Nothing needs to be done, so return
@@ -228,6 +232,8 @@ func (g *InfiniteGame) Flag(x, y int) {
 
 	// Invert the flag field
 	tile.flagged = !tile.flagged
+
+	return
 }
 
 func (g *InfiniteGame) State() GameState {
