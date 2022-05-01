@@ -195,12 +195,12 @@ export default class Camera extends EventManager<CameraEventMap> {
 
                     // At least half the field must be visible
                     const min = {
-                        x: 0 - (fieldRealSize.x / 2),
-                        y: 0 - (fieldRealSize.y / 2)
+                        x: (this.bounds.w / 2) - fieldRealSize.x,
+                        y: (this.bounds.h / 2) - fieldRealSize.y
                     };
                     const max = {
-                        x: this.bounds.w - (fieldRealSize.x / 2),
-                        y: this.bounds.h - (fieldRealSize.y / 2)
+                        x: this.bounds.w / 2,
+                        y: this.bounds.h / 2
                     };
 
                     // Limit the translation
