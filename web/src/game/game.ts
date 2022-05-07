@@ -86,7 +86,8 @@ export type InfiniteGameProps = {
 }
 
 export type GameProps = (FiniteGameProps | InfiniteGameProps) & {
-    handleBack: () => void
+    handleBack: () => void,
+    alreadyInitialised?: boolean
 }
 
 export default class Game {
@@ -111,6 +112,8 @@ export default class Game {
 
     private gameStarted: boolean;
     private gameOver: boolean;
+
+    private readonly autosave: ReturnType<typeof setInterval>;
 
     constructor(props: GameProps) {
         this.props = props;
@@ -205,6 +208,7 @@ export default class Game {
 
         this.bar.addEventListener('close', () => {
             this.bar.stopClock();
+            clearInterval(this.autosave);
             this.deregisterEvents();
             this.props.handleBack();
         });
@@ -223,7 +227,25 @@ export default class Game {
         this.appearance = null;
         this.lastAppearanceRequestTimestamp = 0;
 
-        this.reset();
+        if (!this.props.alreadyInitialised) {
+            this.reset();
+        } else {
+            goio.state().then(stateData => {
+                this.bar.remainingMines = stateData.remainingMines;
+                this.bar.currentElapsed = stateData.timer;
+                if (stateData.state != GAME_STATES.START) {
+                    this.bar.startClock();
+                }
+            });
+            this.camera.load();
+        }
+
+        this.autosave = setInterval(() => {
+            goio.save().then(saveData => {
+                localStorage.setItem('saveData', saveData);
+            });
+            this.camera.save();
+        }, 5000);
 
         this.registerEvents();
     }
@@ -304,6 +326,7 @@ export default class Game {
                 break;
             case BACK_BUTTON.id:
                 this.deregisterEvents();
+                clearInterval(this.autosave);
                 this.props.handleBack();
             }
         });

@@ -1,10 +1,13 @@
 import Game, {FiniteGameProps, InfiniteGameProps} from './game/game';
 import MainMenu, {EASY_BUTTON, HARD_BUTTON, INFINITE_BUTTON, MEDIUM_BUTTON} from './menu/main-menu';
 
+import * as goio from './goio/goio';
+
 import {canvas, ctx, spritesheetLoaded} from './draw';
 import {ElementPressEvent} from './menu/menu';
 
 import '../assets/styles.css';
+import {consoleLog} from './util';
 
 // Make the canvas fullscreen
 function fullscreenCanvas() {
@@ -29,9 +32,11 @@ fullscreenCanvas();
 
 // Create the main menu
 const mainMenu = new MainMenu();
+let mainMenuActive = true;
 
 // Add an event listener for pressing the menu buttons
 mainMenu.addEventListener('press', (event : ElementPressEvent) => {
+    mainMenuActive = false;
     mainMenu.deregisterEvents();
 
     // Determine the game properties
@@ -75,5 +80,54 @@ mainMenu.addEventListener('press', (event : ElementPressEvent) => {
     });
 });
 
+// Look for save data
+const saveData = localStorage.getItem('saveData');
+if (saveData) {
+    consoleLog('Previous game found, attempting to load');
+    goio.load(saveData).then(loadedGame => {
+        mainMenuActive = false;
+        mainMenu.deregisterEvents();
+
+        let gameProps;
+        if ('width' in loadedGame && 'height' in loadedGame && 'mines' in loadedGame) {
+            gameProps = {
+                w: loadedGame.width,
+                h: loadedGame.height,
+                numMines: loadedGame.mines
+            };
+        } else if ('mineDensity' in loadedGame) {
+            gameProps = {
+                mineDensity: loadedGame.mineDensity
+            };
+        } else {
+            consoleLog(`Unknown game properties: ${JSON.stringify(loadedGame)}. Reverting to main menu`);
+            localStorage.removeItem('saveData');
+            localStorage.removeItem('camera');
+        }
+
+        // Create the game
+        new Game({
+            ...gameProps,
+            alreadyInitialised: true,
+            handleBack: () => {
+                localStorage.removeItem('saveData');
+                localStorage.removeItem('camera');
+                mainMenu.registerEvents();
+                mainMenu.draw();
+            }
+        }).draw();
+        consoleLog('Game loaded successfully');
+
+    }).catch(() => {
+        consoleLog('Error while loading game, reverting to main menu');
+        localStorage.removeItem('saveData');
+        localStorage.removeItem('camera');
+    });
+}
+
 // Draw the main menu once the spritesheet has loaded
-spritesheetLoaded.then(() => mainMenu.draw());
+spritesheetLoaded.then(() => {
+    if (mainMenuActive) {
+        mainMenu.draw();
+    }
+});

@@ -66,7 +66,6 @@ cp /usr/local/lib/tinygo/targets/wasm_exec.js ./web/vendor/wasm_exec.js
 
 ### Todo list:
 - Proper pixel frontend
-- Saving/loading
 - Custom difficulty
 - Peer-to-peer multiplayer?
 - Extra cosmetic improvements:

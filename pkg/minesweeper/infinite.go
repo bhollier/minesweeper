@@ -1,7 +1,9 @@
 package minesweeper
 
 import (
+	"encoding/binary"
 	"fmt"
+	"io"
 	"math"
 	"math/rand"
 	"time"
@@ -15,7 +17,28 @@ type chunkTile struct {
 	mine       bool
 }
 
-type chunk = [ChunkSize][ChunkSize]chunkTile
+func (t chunkTile) toByte() (b byte) {
+	if t.discovered {
+		b |= 1 << 0
+	}
+	if t.flagged {
+		b |= 1 << 1
+	}
+	if t.mine {
+		b |= 1 << 2
+	}
+	return
+}
+
+func chunkTileFromByte(b byte) chunkTile {
+	return chunkTile{
+		discovered: b&1 != 0,
+		flagged:    b&2 != 0,
+		mine:       b&4 != 0,
+	}
+}
+
+type chunk [ChunkSize][ChunkSize]chunkTile
 
 // randomChunk just creates a chunk with the given number of mines
 func randomChunk(numMines int) *chunk {
@@ -65,6 +88,26 @@ func randomChunkFromFirstMove(numMines int, startPos Pos) *chunk {
 		}
 	}
 	return c
+}
+
+func (c *chunk) toBytes() (b []byte) {
+	b = make([]byte, ChunkSize*ChunkSize)
+	for y, row := range c {
+		for x, tile := range row {
+			b[(y*ChunkSize)+x] = tile.toByte()
+		}
+	}
+	return
+}
+
+func chunkFromBytes(b []byte) (c *chunk) {
+	c = new(chunk)
+	for y := 0; y < ChunkSize; y++ {
+		for x := 0; x < ChunkSize; x++ {
+			c[y][x] = chunkTileFromByte(b[(y*ChunkSize)+x])
+		}
+	}
+	return
 }
 
 func mod(a, b int) int {
@@ -202,13 +245,11 @@ func (g *InfiniteGame) Uncover(x, y int) (s GameState) {
 }
 
 // Flag the tile at the given coordinate, always returns Int.MAX_VALUE
-func (g *InfiniteGame) Flag(x, y int) (remaining float64) {
-	remaining = math.Inf(1)
-
+func (g *InfiniteGame) Flag(x, y int) float64 {
 	// If the game has ended
 	if g.state > GameStatePlaying {
 		// Nothing needs to be done, so return
-		return
+		return g.RemainingMines()
 	}
 
 	// Get the tile
@@ -216,13 +257,13 @@ func (g *InfiniteGame) Flag(x, y int) (remaining float64) {
 
 	// If the tile is already discovered, just return
 	if tile.discovered {
-		return
+		return g.RemainingMines()
 	}
 
 	// Invert the flag field
 	tile.flagged = !tile.flagged
 
-	return
+	return g.RemainingMines()
 }
 
 func (g *InfiniteGame) State() GameState {
@@ -234,7 +275,18 @@ func (g *InfiniteGame) StartTime() time.Time {
 }
 
 func (g *InfiniteGame) SinceStart() time.Duration {
+	if g.state == GameStateStart {
+		return 0
+	}
 	return time.Now().Sub(g.startTime)
+}
+
+func (g *InfiniteGame) MineDensity() int {
+	return g.mineDensity
+}
+
+func (g *InfiniteGame) RemainingMines() float64 {
+	return math.Inf(1)
 }
 
 func (g *InfiniteGame) Appearance(x, y, w, h int) (appearance map[Pos]TileType) {
@@ -282,6 +334,105 @@ func (g *InfiniteGame) Appearance(x, y, w, h int) (appearance map[Pos]TileType) 
 		}
 	}
 	return appearance
+}
+
+func (g *InfiniteGame) Save(w io.Writer) error {
+	err := newHeader(saveHeaderInfiniteGameType).save(w)
+	if err != nil {
+		return err
+	}
+
+	// Write the mine density and start time as 64 bit ints
+	for _, data := range []int64{int64(g.mineDensity), g.startTime.UnixNano()} {
+		err = binary.Write(w, serialiseByteOrder, data)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Write the state into a single byte
+	err = binary.Write(w, serialiseByteOrder, byte(g.state))
+	if err != nil {
+		return err
+	}
+
+	// Write the number of chunks
+	err = binary.Write(w, serialiseByteOrder, int64(len(g.field)))
+	if err != nil {
+		return err
+	}
+
+	// Write the chunks
+	for pos, chunk := range g.field {
+		// Write the position
+		for _, data := range []int64{int64(pos.X), int64(pos.Y)} {
+			err = binary.Write(w, serialiseByteOrder, data)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Write the chunk data
+		_, err = w.Write(chunk.toBytes())
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func loadInfinite(r io.Reader) (Game, error) {
+	g := &InfiniteGame{}
+
+	// Read the first 2 fields as 64 bit ints
+	fields := make([]int64, 2)
+	err := binary.Read(r, serialiseByteOrder, fields)
+	if err != nil {
+		return nil, err
+	}
+
+	// todo int overflow
+	g.mineDensity = int(fields[0])
+	g.startTime = time.Unix(0, fields[1])
+
+	// Read the state byte
+	// todo handle invalid state
+	var state byte
+	err = binary.Read(r, serialiseByteOrder, &state)
+	if err != nil {
+		return nil, err
+	}
+	g.state = GameState(state)
+
+	// Read the number of chunks
+	var numChunks int64
+	err = binary.Read(r, serialiseByteOrder, &numChunks)
+	if err != nil {
+		return nil, err
+	}
+
+	// Read the chunks
+	g.field = make(map[Pos]*chunk, numChunks)
+	for i := int64(0); i < numChunks; i++ {
+		// Read the position
+		pos := make([]int64, 2)
+		err = binary.Read(r, serialiseByteOrder, pos)
+		if err != nil {
+			return nil, err
+		}
+
+		// Read the chunk
+		chunkBytes := make([]byte, ChunkSize*ChunkSize)
+		_, err = r.Read(chunkBytes)
+		if err != nil {
+			return nil, err
+		}
+		// todo int overflow
+		g.field[Pos{X: int(pos[0]), Y: int(pos[1])}] = chunkFromBytes(chunkBytes)
+	}
+
+	return g, nil
 }
 
 // Retrieve the tile at the given position, and automatically populate the

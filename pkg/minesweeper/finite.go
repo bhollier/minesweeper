@@ -1,7 +1,9 @@
 package minesweeper
 
 import (
+	"encoding/binary"
 	"fmt"
+	"io"
 	"math/rand"
 	"time"
 )
@@ -9,7 +11,7 @@ import (
 // FiniteGame stores a finite minesweeper game
 type FiniteGame struct {
 	w, h, numMines int
-	field          [][]Tile
+	field          Field
 	state          GameState
 	startTime      time.Time
 	flags          int
@@ -24,7 +26,7 @@ func NewGame(width int, height int, numMines int) (Game, error) {
 	}
 
 	// Create the grid
-	g.field = make([][]Tile, g.h)
+	g.field = make(Field, g.h)
 	for y := 0; y < g.h; y++ {
 		g.field[y] = make([]Tile, g.w)
 	}
@@ -144,7 +146,7 @@ func (g *FiniteGame) Flag(x, y int) float64 {
 	if x < 0 || x >= g.w || y < 0 || y >= g.h ||
 		g.field[y][x].Discovered || g.state > GameStatePlaying {
 		// Nothing needs to be done, so return
-		return float64(g.numMines - g.flags)
+		return g.RemainingMines()
 	}
 
 	// Invert the flag field
@@ -156,7 +158,7 @@ func (g *FiniteGame) Flag(x, y int) float64 {
 		g.flags--
 	}
 
-	return float64(g.numMines - g.flags)
+	return g.RemainingMines()
 }
 
 func (g *FiniteGame) State() GameState {
@@ -168,7 +170,22 @@ func (g *FiniteGame) StartTime() time.Time {
 }
 
 func (g *FiniteGame) SinceStart() time.Duration {
+	if g.state == GameStateStart {
+		return 0
+	}
 	return time.Now().Sub(g.startTime)
+}
+
+func (g *FiniteGame) Size() (w, h int) {
+	return g.w, g.h
+}
+
+func (g *FiniteGame) StartingMines() int {
+	return g.numMines
+}
+
+func (g *FiniteGame) RemainingMines() float64 {
+	return float64(g.numMines - g.flags)
 }
 
 func (g *FiniteGame) Appearance(x, y, w, h int) map[Pos]TileType {
@@ -200,36 +217,82 @@ func (g *FiniteGame) Appearance(x, y, w, h int) map[Pos]TileType {
 	return appearance
 }
 
-type gameExportedFields struct {
-	W, H, M int
-	F       [][]Tile
-	S       GameState
-	ST      time.Time
-}
-
-// todo TinyGo doesn't support encoding/gob
-//  https://tinygo.org/docs/reference/lang-support/stdlib/#encodinggob
-/*
-// Save the state of the game into the given io.Writer
 func (g *FiniteGame) Save(w io.Writer) error {
-	enc := gob.NewEncoder(w)
-	return enc.Encode(gameExportedFields{
-		g.w, g.h, g.numMines,
-		g.field, g.state, g.startTime,
-	})
+	err := newHeader(saveHeaderFiniteGameType).save(w)
+	if err != nil {
+		return err
+	}
+
+	// Write the field size, number of mines and start time as 64 bit ints
+	for _, data := range []int64{int64(g.w), int64(g.h),
+		int64(g.numMines), g.startTime.UnixNano()} {
+		err = binary.Write(w, serialiseByteOrder, data)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Write the state into a single byte
+	err = binary.Write(w, serialiseByteOrder, byte(g.state))
+	if err != nil {
+		return err
+	}
+
+	// Convert the field to bytes and write it
+	_, err = w.Write(g.field.toBytes())
+	if err != nil {
+		return err
+	}
+
+	// no need to save g.flags, it can be calculated from g.field
+
+	return nil
 }
 
-// Load a game from the given io.Reader
-func Load(r io.Reader) (*Game, error) {
-	g := gameExportedFields{}
-	dec := gob.NewDecoder(r)
-	err := dec.Decode(&g)
-	return &FiniteGame{
-		g.W, g.H, g.M,
-		g.F, g.S, g.ST,
-	}, err
+func loadFinite(r io.Reader) (Game, error) {
+	g := &FiniteGame{}
+
+	// Read the first 4 fields as 64 bit ints
+	fields := make([]int64, 4)
+	err := binary.Read(r, serialiseByteOrder, fields)
+	if err != nil {
+		return nil, err
+	}
+
+	// todo int overflow
+	g.w, g.h = int(fields[0]), int(fields[1])
+	g.numMines = int(fields[2])
+	g.startTime = time.Unix(0, fields[3])
+
+	// Read the state byte
+	// todo handle invalid state
+	var state byte
+	err = binary.Read(r, serialiseByteOrder, &state)
+	if err != nil {
+		return nil, err
+	}
+	g.state = GameState(state)
+
+	// Read the field bytes
+	fieldBytes := make([]byte, g.w*g.h)
+	_, err = r.Read(fieldBytes)
+	if err != nil {
+		return nil, err
+	}
+	// Convert
+	g.field = fieldFromBytes(g.w, g.h, fieldBytes)
+
+	// Calculate the number of flags
+	for _, row := range g.field {
+		for _, tile := range row {
+			if tile.Flagged {
+				g.flags++
+			}
+		}
+	}
+
+	return g, nil
 }
-*/
 
 type tileAndPos struct {
 	Pos

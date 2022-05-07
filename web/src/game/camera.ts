@@ -471,4 +471,20 @@ export default class Camera extends EventManager<CameraEventMap> {
         canvas.removeEventListener('pointerup', this.handlePointerUp);
     }
 
+    public save() {
+        localStorage.setItem('camera', JSON.stringify({
+            translation: this.translation,
+            scale: this.scale
+        }));
+    }
+
+    public load() {
+        const savedCameraStr = localStorage.getItem('camera');
+        if (savedCameraStr) {
+            const savedCamera = JSON.parse(savedCameraStr);
+            this.translation = savedCamera.translation;
+            this.scale = savedCamera.scale;
+        }
+    }
+
 }

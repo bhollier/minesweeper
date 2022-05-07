@@ -1,6 +1,8 @@
 package webio
 
 import (
+	"bytes"
+	"encoding/base64"
 	"fmt"
 	ms "github.com/bhollier/minesweeper/pkg/minesweeper"
 	"math"
@@ -47,14 +49,16 @@ func (io *WebIO) eventHandler(_ js.Value, args []js.Value) interface{} {
 		io.handleInit(msg)
 	case "appearance":
 		io.handleAppearance(msg)
+	case "state":
+		io.handleState(msg)
 	case "uncover":
 		io.handleUncover(msg)
 	case "flag":
 		io.handleFlag(msg)
-	/*case "save":
+	case "save":
 		io.handleSave(msg)
 	case "load":
-		io.handleLoad(msg)*/
+		io.handleLoad(msg)
 	default:
 		sendError(msg, fmt.Errorf("Unknown cmd "+msg.Cmd))
 	}
@@ -156,10 +160,40 @@ func flagPayload(remaining float64) map[string]interface{} {
 	}
 }
 
+func fullStatePayload(game ms.Game) map[string]interface{} {
+	payload := statePayload(game.State(), game.SinceStart())
+	for key, value := range flagPayload(game.RemainingMines()) {
+		payload[key] = value
+	}
+	return payload
+}
+
+func loadPayload(game ms.Game) map[string]interface{} {
+	switch g := game.(type) {
+	case *ms.FiniteGame:
+		w, h := g.Size()
+		return map[string]interface{}{
+			"width":  w,
+			"height": h,
+			"mines":  g.StartingMines(),
+		}
+	case *ms.InfiniteGame:
+		return map[string]interface{}{
+			"mineDensity": g.MineDensity(),
+		}
+	default:
+		panic("unknown game type")
+	}
+}
+
 func (io *WebIO) handleAppearance(msg Message) {
 	x, y, w, h := msg.Data.Get("x").Int(), msg.Data.Get("y").Int(),
 		msg.Data.Get("w").Int(), msg.Data.Get("h").Int()
 	sendSuccessWithPayload(msg, appearancePayload(io.game.Appearance(x, y, w, h)))
+}
+
+func (io *WebIO) handleState(msg Message) {
+	sendSuccessWithPayload(msg, fullStatePayload(io.game))
 }
 
 func (io *WebIO) handleUncover(msg Message) {
@@ -172,29 +206,23 @@ func (io *WebIO) handleFlag(msg Message) {
 	sendSuccessWithPayload(msg, flagPayload(remaining))
 }
 
-/*
 func (io *WebIO) handleSave(msg Message) {
 	consoleLog("Received '" + msg.Cmd + "'")
-	// Copy the game
-	gCopy := *io.game
-	// Start a thread to save it
-	go func() {
-		// Save the game state to the byte buffer
-		var buf bytes.Buffer
-		err := gCopy.Save(&buf)
-		if err != nil {
-			sendError(msg, err)
-		} else {
-			sendSuccessWithPayload(msg, hex.EncodeToString(buf.Bytes()))
-		}
-	}()
+	// todo clone the game to save multithreaded?
+	// Save the game state to the byte buffer
+	var buf bytes.Buffer
+	err := io.game.Save(&buf)
+	if err != nil {
+		sendError(msg, err)
+	} else {
+		sendSuccessWithPayload(msg, base64.StdEncoding.EncodeToString(buf.Bytes()))
+	}
 }
 
 func (io *WebIO) handleLoad(msg Message) {
 	consoleLog("Received '" + msg.Cmd + "'")
 	// Decode the event message as a hex string
-	consoleLogF("Decoding save data '%s'", msg.Data.String())
-	b, err := hex.DecodeString(msg.Data.String())
+	b, err := base64.StdEncoding.DecodeString(msg.Data.String())
 	if err != nil {
 		sendError(msg, err)
 		return
@@ -211,6 +239,5 @@ func (io *WebIO) handleLoad(msg Message) {
 	// If all goes well, set the game to the new one
 	io.game = g
 	// Send OK
-	sendSuccess(msg)
+	sendSuccessWithPayload(msg, loadPayload(io.game))
 }
-*/

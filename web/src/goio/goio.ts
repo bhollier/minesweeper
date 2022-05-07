@@ -22,6 +22,16 @@ export function appearance(data: AppearanceRequestData): Promise<AppearanceRespo
     return postMessage('appearance', data);
 }
 
+export type StateResponseData = {
+    state: string,
+    timer: number,
+    remainingMines: number
+}
+
+export function state(): Promise<StateResponseData> {
+    return postMessage('state');
+}
+
 export type UncoverRequestData = Pos
 
 export type UncoverResponseData = {
@@ -41,4 +51,18 @@ export type FlagResponseData = {
 
 export function flag(data: FlagRequestData): Promise<FlagResponseData> {
     return postMessage('flag', data);
+}
+
+export type SaveResponseData = string
+
+export function save(): Promise<SaveResponseData> {
+    return postMessage('save');
+}
+
+export type LoadRequestData = SaveResponseData
+
+export type LoadResponseData = InitRequestData
+
+export function load(data: LoadRequestData): Promise<LoadResponseData> {
+    return postMessage('load', data);
 }
