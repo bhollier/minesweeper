@@ -43,23 +43,25 @@ export default class Bar extends EventManager<BarEventMap> {
     }
 
     public startClock() {
-        // The timestamp of when the elapsed time was last updated
-        let lastElapsedTimestamp = Date.now();
-        // The elapsed time (in seconds) when the bar was last drawn
-        let lastDrawnElapsed = Math.floor(this.currentElapsed / 1000);
-        // Create the clock
-        this.clock = setInterval(async () => {
-            const now = Date.now();
-            // Add the elapsed time
-            this.currentElapsed += now - lastElapsedTimestamp;
-            // If the elapsed time (in seconds) has changed
-            if (Math.floor(this.currentElapsed / 1000) !== lastDrawnElapsed) {
-                // Draw the bar
-                await this.draw();
-                lastDrawnElapsed = Math.floor(this.currentElapsed / 1000);
-            }
-            lastElapsedTimestamp = now;
-        }, 100);
+        if (!this.clock) {
+            // The timestamp of when the elapsed time was last updated
+            let lastElapsedTimestamp = Date.now();
+            // The elapsed time (in seconds) when the bar was last drawn
+            let lastDrawnElapsed = Math.floor(this.currentElapsed / 1000);
+            // Create the clock
+            this.clock = setInterval(async () => {
+                const now = Date.now();
+                // Add the elapsed time
+                this.currentElapsed += now - lastElapsedTimestamp;
+                // If the elapsed time (in seconds) has changed
+                if (Math.floor(this.currentElapsed / 1000) !== lastDrawnElapsed) {
+                    // Draw the bar
+                    await this.draw();
+                    lastDrawnElapsed = Math.floor(this.currentElapsed / 1000);
+                }
+                lastElapsedTimestamp = now;
+            }, 100);
+        }
     }
 
     public stopClock() {

@@ -32,6 +32,11 @@
             "error", {
                 "allowSeparatedGroups": true
             }
+        ],
+        "@typescript-eslint/no-empty-function": [
+            "error", {
+                "allow": ["private-constructors"]
+            }
         ]
     }
 }

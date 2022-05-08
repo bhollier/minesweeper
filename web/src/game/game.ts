@@ -1,77 +1,19 @@
+import State, {StateStack} from '../state/state';
+
 import Camera, {PressEvent} from './camera';
 import {canvas, ctx} from '../draw';
 import Bar from './bar';
 
 import * as goio from '../goio/goio';
+import {ElementPressEvent} from '../menu/menu';
+import Modal from '../menu/modal';
 
-import Modal, {BACK_BUTTON, CLOSE_BUTTON} from '../menu/modal';
 import RetryModal, {RETRY_BUTTON} from '../menu/retry-modal';
 import SuccessModal, {RESET_BUTTON} from '../menu/success-modal';
-import {ElementPressEvent} from '../menu/menu';
+import ModalState from '../state/modal-state';
 
 import {Rect, Size} from '../common';
 import {consoleLog} from '../util';
-
-// Constants for the game states
-const GAME_STATES = {
-    START: 'start',
-    PLAYING: 'playing',
-    WIN: 'win',
-    LOSS: 'loss'
-};
-
-class ModalContainer {
-    private modal: Modal | null;
-    #hidden: boolean;
-
-    constructor() {
-        this.modal = null;
-        this.#hidden = true;
-    }
-
-    public open(modal: Modal) {
-        this.modal = modal;
-        this.#hidden = false;
-    }
-
-    public close() {
-        if (!this.modal) {
-            throw new Error('No modal to close');
-        }
-        this.hide();
-        this.modal = null;
-    }
-
-    public get hidden() {
-        return this.#hidden;
-    }
-
-    public hide() {
-        if (!this.modal) {
-            throw new Error('No modal to hide');
-        }
-        this.modal.deregisterEvents();
-        this.#hidden = true;
-    }
-
-    public reveal() {
-        if (!this.modal) {
-            throw new Error('No modal to reveal');
-        }
-        this.modal.registerEvents();
-        this.#hidden = false;
-    }
-
-    public async draw() {
-        if (!this.#hidden) {
-            await this.modal.draw();
-        }
-    }
-
-    public deregisterEvents() {
-        this.modal?.deregisterEvents();
-    }
-}
 
 function preventDefault(e: Event) {
     e.preventDefault();
@@ -85,12 +27,9 @@ export type InfiniteGameProps = {
     mineDensity: number
 }
 
-export type GameProps = (FiniteGameProps | InfiniteGameProps) & {
-    handleBack: () => void,
-    alreadyInitialised?: boolean
-}
+export type GameProps = FiniteGameProps | InfiniteGameProps
 
-export default class Game {
+export default class Game extends State {
     private readonly props: GameProps;
 
     private readonly handleResize: () => void;
@@ -101,7 +40,6 @@ export default class Game {
 
     private readonly bar: Bar;
     private readonly camera: Camera;
-    private readonly modal: ModalContainer;
 
     // The current appearance of the field, not necessarily of the whole field
     private appearance: {
@@ -110,12 +48,13 @@ export default class Game {
     } | null;
     private lastAppearanceRequestTimestamp: number;
 
-    private gameStarted: boolean;
-    private gameOver: boolean;
+    private gameState: goio.GameState;
 
     private readonly autosave: ReturnType<typeof setInterval>;
 
-    constructor(props: GameProps) {
+    constructor(stack: StateStack, props: GameProps, alreadyInitialised?: boolean) {
+        super(stack);
+
         this.props = props;
 
         const bounds = Game.bounds();
@@ -137,15 +76,14 @@ export default class Game {
             // Synchronise the current elapsed time with the Go backend
             this.bar.currentElapsed = stateData.timer;
 
-            switch (stateData.state) {
-            case GAME_STATES.WIN:
-                this.gameOver = true;
+            this.gameState = stateData.state;
+            switch (this.gameState) {
+            case goio.GameState.Win:
                 this.bar.stopClock();
                 consoleLog('Win detected, displaying success modal');
                 this.createEndGameModal(SuccessModal, RESET_BUTTON.id);
                 break;
-            case GAME_STATES.LOSS:
-                this.gameOver = true;
+            case goio.GameState.Loss:
                 this.bar.stopClock();
                 consoleLog('Loss detected, displaying retry modal');
                 setTimeout(() => this.createEndGameModal(RetryModal, RETRY_BUTTON.id),
@@ -164,13 +102,12 @@ export default class Game {
         };
 
         this.handlePress = (event: PressEvent) => {
-            if (!this.gameOver) {
+            if (this.gameState !== goio.GameState.Win && this.gameState !== goio.GameState.Loss) {
                 // Left mouse button
                 if (event.button === 0) {
                     goio.uncover(event.pos)
                         .then(async state => {
-                            if (!this.gameStarted) {
-                                this.gameStarted = true;
+                            if (this.gameState === goio.GameState.Start) {
                                 this.bar.startClock();
                             }
                             await this.draw(true);
@@ -182,19 +119,16 @@ export default class Game {
                     goio.flag(event.pos)
                         .then(this.handleFlag);
                 }
-
-                // If the game is over but the modal is hidden
-            } else if (this.modal.hidden) {
-                // Reopen the modal
-                this.modal.reveal();
-                this.bar.deregisterEvents();
-                this.camera.deregisterEvents();
-                this.draw();
+            } else if (this.gameState === goio.GameState.Win) {
+                this.createEndGameModal(SuccessModal, RESET_BUTTON.id);
+            } else if (this.gameState === goio.GameState.Loss) {
+                this.createEndGameModal(RetryModal, RETRY_BUTTON.id);
             }
         };
 
         this.handleLongPress = (event: PressEvent) => {
-            if (!this.gameOver && event.button === 0) {
+            if (this.gameState !== goio.GameState.Win && this.gameState !== goio.GameState.Loss
+                && event.button === 0) {
                 goio.flag(event.pos)
                     .then(this.handleFlag);
             }
@@ -207,10 +141,8 @@ export default class Game {
         this.bar = new Bar(bounds.bar, remainingMines);
 
         this.bar.addEventListener('close', () => {
-            this.bar.stopClock();
-            clearInterval(this.autosave);
-            this.deregisterEvents();
-            this.props.handleBack();
+            // Pop this state off the stack
+            this.pop();
         });
 
         let fieldSize;
@@ -223,29 +155,23 @@ export default class Game {
         this.camera.addEventListener('longpress', this.handleLongPress);
         this.camera.addEventListener('move', () => this.draw());
 
-        this.modal = new ModalContainer();
         this.appearance = null;
         this.lastAppearanceRequestTimestamp = 0;
 
-        if (!this.props.alreadyInitialised) {
+        if (!alreadyInitialised) {
             this.reset();
         } else {
             goio.state().then(stateData => {
                 this.bar.remainingMines = stateData.remainingMines;
                 this.bar.currentElapsed = stateData.timer;
-                if (stateData.state != GAME_STATES.START) {
+                if (stateData.state !== goio.GameState.Start) {
                     this.bar.startClock();
                 }
             });
             this.camera.load();
         }
 
-        this.autosave = setInterval(() => {
-            goio.save().then(saveData => {
-                localStorage.setItem('saveData', saveData);
-            });
-            this.camera.save();
-        }, 5000);
+        this.autosave = setInterval(() => this.save(), 5000);
 
         this.registerEvents();
     }
@@ -278,8 +204,7 @@ export default class Game {
             this.bar.remainingMines = this.props.numMines;
         }
 
-        this.gameStarted = false;
-        this.gameOver = false;
+        this.gameState = goio.GameState.Start;
 
         let initialisePromise;
         // Finite type
@@ -303,38 +228,20 @@ export default class Game {
         initialisePromise.then(() => this.draw(true));
     }
 
-    private async createEndGameModal(modalConstructor: () => void, resetElementId: string) {
-        // Display the modal
-        const modal: Modal = new modalConstructor();
-        this.modal.open(modal);
-        // Add some common event handlers
-        modal.addEventListener('hover', () => this.draw());
+    private createEndGameModal<T extends Modal>(modalCtor: new() => T, resetElementId: string) {
+        // Create the modal
+        const modal = this.stack.push(ModalState, modalCtor).modal;
+        // Add an event listener for reset
         modal.addEventListener('press', (event: ElementPressEvent) => {
-            switch (event.pressedElement) {
-            case CLOSE_BUTTON.id:
-                this.modal.hide();
-                this.bar.registerEvents();
-                this.camera.registerEvents();
-                this.draw();
-                break;
-            case resetElementId:
-                this.modal.close();
-                this.bar.registerEvents();
-                this.camera.registerEvents();
+            if (event.pressedElement === resetElementId) {
+                // Pop the modal
+                this.stack.pop();
+                // Reset the game
                 this.reset();
-                this.draw();
-                break;
-            case BACK_BUTTON.id:
-                this.deregisterEvents();
-                clearInterval(this.autosave);
-                this.props.handleBack();
+                // Redraw
+                this.stack.draw();
             }
         });
-        // The modal is open so don't allow the background elements to be interactable
-        this.bar.deregisterEvents();
-        this.camera.deregisterEvents();
-        // Draw the modal
-        await this.draw();
     }
 
     private shouldUpdateAppearance(): boolean {
@@ -384,18 +291,14 @@ export default class Game {
         // Draw the appearance
         await this.camera.draw(this.appearance.data)
             // Then draw the GUI bar
-            .then(() => this.bar.draw())
-            // Then draw the modal over top (if active)
-            .then(() => this.modal.draw());
+            .then(() => this.bar.draw());
     }
 
     public registerEvents() {
         window.addEventListener('resize', this.handleResize);
         canvas.addEventListener('contextmenu', preventDefault);
-        if (this.modal.hidden) {
-            this.bar.registerEvents();
-            this.camera.registerEvents();
-        }
+        this.bar.registerEvents();
+        this.camera.registerEvents();
     }
 
     public deregisterEvents() {
@@ -403,6 +306,57 @@ export default class Game {
         canvas.removeEventListener('contextmenu', preventDefault);
         this.bar.deregisterEvents();
         this.camera.deregisterEvents();
-        this.modal.deregisterEvents();
+    }
+
+    protected onPop() {
+        this.bar.stopClock();
+        clearInterval(this.autosave);
+    }
+
+    public save() {
+        goio.save().then(saveData => {
+            localStorage.setItem('saveData', saveData);
+        });
+        this.camera.save();
+    }
+
+    // If a valid save exists, loads the game onto the top of the stack.
+    // Otherwise the stack isn't modified
+    public static async load(stack: StateStack): Promise<Game> {
+        const saveData = localStorage.getItem('saveData');
+        if (saveData) {
+            consoleLog('Previous game found, attempting to load');
+            try {
+                const loadedGame = await goio.load(saveData);
+
+                let gameProps;
+                if ('width' in loadedGame && 'height' in loadedGame && 'mines' in loadedGame) {
+                    gameProps = {
+                        w: loadedGame.width,
+                        h: loadedGame.height,
+                        numMines: loadedGame.mines
+                    };
+                } else if ('mineDensity' in loadedGame) {
+                    gameProps = {
+                        mineDensity: loadedGame.mineDensity
+                    };
+                } else {
+                    consoleLog(`Unknown game properties: ${JSON.stringify(loadedGame)}. Reverting to main menu`);
+                    localStorage.removeItem('saveData');
+                    localStorage.removeItem('camera');
+                }
+
+                consoleLog('Game loaded successfully');
+
+                // Create the game
+                stack.push(Game, gameProps, true);
+
+            } catch (error) {
+                consoleLog('Error while loading game, reverting to main menu');
+                localStorage.removeItem('saveData');
+                localStorage.removeItem('camera');
+            }
+        }
+        return null;
     }
 }

@@ -2,6 +2,13 @@ import {postMessage} from './worker-helper';
 
 import {Pos, Rect} from '../common';
 
+export enum GameState {
+    Start = 'start',
+    Playing = 'playing',
+    Win = 'win',
+    Loss = 'loss',
+}
+
 export type InitRequestData = {
     width: number,
     height: number,
@@ -35,7 +42,7 @@ export function state(): Promise<StateResponseData> {
 export type UncoverRequestData = Pos
 
 export type UncoverResponseData = {
-    state: string,
+    state: GameState,
     timer: number
 }
 
