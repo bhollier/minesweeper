@@ -23,6 +23,7 @@ jobs:
 
       - name: Build Go
         run: |
+          go mod download
           mkdir ./web/wasm
           tinygo build -o ./web/wasm/app.wasm -target wasm --no-debug ./cmd/web/main.go
 
