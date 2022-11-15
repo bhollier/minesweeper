@@ -1,0 +1,17 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Compile wasm" type="GoApplicationRunConfiguration" factoryName="Go Application">
+    <module name="minesweeper" />
+    <working_directory value="$PROJECT_DIR$" />
+    <go_parameters value="-o ../../web/wasm/app.wasm" />
+    <envs>
+      <env name="GOOS" value="js" />
+      <env name="GOARCH" value="wasm" />
+    </envs>
+    <kind value="FILE" />
+    <package value="github.com/bhollier/minesweeper/cmd" />
+    <directory value="$PROJECT_DIR$" />
+    <filePath value="$PROJECT_DIR$/cmd/web/main.go" />
+    <option name="run" value="false" />
+    <method v="2" />
+  </configuration>
+</component>

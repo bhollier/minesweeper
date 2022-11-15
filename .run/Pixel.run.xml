@@ -1,0 +1,12 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Pixel" type="GoApplicationRunConfiguration" factoryName="Go Application">
+    <module name="minesweeper" />
+    <working_directory value="$PROJECT_DIR$" />
+    <go_parameters value="-o ../../minesweeper.exe -ldflags -H=windowsgui" />
+    <kind value="PACKAGE" />
+    <package value="github.com/bhollier/minesweeper/cmd/pixel" />
+    <directory value="$PROJECT_DIR$" />
+    <filePath value="$PROJECT_DIR$/cmd/pixel/main.go" />
+    <method v="2" />
+  </configuration>
+</component>
